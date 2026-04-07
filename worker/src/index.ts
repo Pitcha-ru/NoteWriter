@@ -14,6 +14,11 @@ export default {
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         headers: {
+          // Wildcard is safe here: this worker is called from a WebView (not a
+          // browser tab), so there is no cookie-based credential to hijack via
+          // CSRF. Bearer tokens are attached explicitly by client code and are
+          // not automatically sent by the browser's fetch, making the wildcard
+          // CORS policy non-exploitable in this context.
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -22,12 +27,20 @@ export default {
     }
 
     const response = await handleRequest(request, env, path, url)
+    // See comment above — wildcard is acceptable for this WebView-only API.
     response.headers.set('Access-Control-Allow-Origin', '*')
     return response
   },
 } satisfies ExportedHandler<Env>
 
+const VALID_LANGS = new Set(['en', 'el', 'fr', 'de'])
+
 async function handleRequest(request: Request, env: Env, path: string, url: URL): Promise<Response> {
+  // Fix 7: Fail fast if ENCRYPTION_KEY is not configured.
+  if (!env.ENCRYPTION_KEY) {
+    return json({ error: 'Server configuration error' }, 500)
+  }
+
   // Public route: registration
   if (path === '/api/register' && request.method === 'POST') {
     const body = await request.json<{ device_id: string }>()
@@ -102,6 +115,9 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
     if (!body.text || !body.source_lang || !body.target_lang) {
       return json({ error: 'text, source_lang, and target_lang required' }, 400)
     }
+    if (body.text.length > 5000) {
+      return json({ error: 'Text too long (max 5000 chars)' }, 400)
+    }
     const keys = await getCachedKeys(deviceId, env.KV, env.ENCRYPTION_KEY)
     if (!keys) return json({ error: 'API keys not configured' }, 400)
     try {
@@ -124,6 +140,12 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
     }
     if (request.method === 'POST') {
       const body = await request.json<{ listen_lang: string; translate_lang: string }>()
+      if (!body.listen_lang || !body.translate_lang) {
+        return json({ error: 'listen_lang and translate_lang required' }, 400)
+      }
+      if (!VALID_LANGS.has(body.listen_lang) || !VALID_LANGS.has(body.translate_lang)) {
+        return json({ error: 'Invalid language. Allowed: en, el, fr, de' }, 400)
+      }
       const session = await createSession(deviceId, body.listen_lang, body.translate_lang, env.DB)
       return json(session, 201)
     }
@@ -140,9 +162,19 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
     }
     if (request.method === 'PATCH') {
       const body = await request.json<{ original: string; translation: string }>()
-      const paragraph = await appendParagraph(sessionId, deviceId, body.original, body.translation, env.DB)
-      if (!paragraph) return json({ error: 'Session not found' }, 404)
-      return json(paragraph, 201)
+      if (!body.original || !body.translation) {
+        return json({ error: 'original and translation are required non-empty strings' }, 400)
+      }
+      try {
+        const paragraph = await appendParagraph(sessionId, deviceId, body.original, body.translation, env.DB)
+        if (!paragraph) return json({ error: 'Session not found' }, 404)
+        return json(paragraph, 201)
+      } catch (err) {
+        if (err instanceof Error && err.message.includes('UNIQUE')) {
+          return json({ error: 'Conflict: duplicate paragraph position' }, 409)
+        }
+        throw err
+      }
     }
     if (request.method === 'DELETE') {
       const deleted = await deleteSession(sessionId, deviceId, env.DB)

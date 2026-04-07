@@ -26,13 +26,21 @@ export async function createSession(deviceId: string, listenLang: string, transl
 export async function listSessions(deviceId: string, cursor: string | null, limit: number, db: D1Database): Promise<{ sessions: Session[]; cursor: string | null }> {
   let query = 'SELECT * FROM sessions WHERE device_id = ?'
   const params: unknown[] = [deviceId]
-  if (cursor) { query += ' AND created_at < ?'; params.push(cursor) }
-  query += ' ORDER BY created_at DESC LIMIT ?'
+  if (cursor) {
+    const [cursorCreatedAt, cursorId] = cursor.split('|')
+    query += ' AND (created_at < ? OR (created_at = ? AND id < ?))'
+    params.push(cursorCreatedAt, cursorCreatedAt, cursorId)
+  }
+  query += ' ORDER BY created_at DESC, id DESC LIMIT ?'
   params.push(limit + 1)
   const result = await db.prepare(query).bind(...params).all<Session>()
   const sessions = result.results
   let nextCursor: string | null = null
-  if (sessions.length > limit) { sessions.pop(); nextCursor = sessions[sessions.length - 1].created_at }
+  if (sessions.length > limit) {
+    sessions.pop()
+    const last = sessions[sessions.length - 1]
+    nextCursor = `${last.created_at}|${last.id}`
+  }
   return { sessions, cursor: nextCursor }
 }
 
@@ -54,15 +62,16 @@ export async function getSession(sessionId: string, deviceId: string, cursor: nu
 export async function appendParagraph(sessionId: string, deviceId: string, original: string, translation: string, db: D1Database): Promise<Paragraph | null> {
   const session = await db.prepare('SELECT id FROM sessions WHERE id = ? AND device_id = ?').bind(sessionId, deviceId).first()
   if (!session) return null
-  const last = await db.prepare('SELECT MAX(position) as max_pos FROM paragraphs WHERE session_id = ?').bind(sessionId).first<{ max_pos: number | null }>()
-  const position = (last?.max_pos ?? -1) + 1
   const id = crypto.randomUUID()
-  await db.prepare('INSERT INTO paragraphs (id, session_id, position, original, translation) VALUES (?, ?, ?, ?, ?)')
-    .bind(id, sessionId, position, original, translation).run()
-  if (position === 0) {
+  await db.prepare(
+    'INSERT INTO paragraphs (id, session_id, position, original, translation) SELECT ?, ?, COALESCE(MAX(position), -1) + 1, ?, ? FROM paragraphs WHERE session_id = ?'
+  ).bind(id, sessionId, original, translation, sessionId).run()
+  const position = await db.prepare('SELECT position FROM paragraphs WHERE id = ?').bind(id).first<{ position: number }>()
+  const pos = position!.position
+  if (pos === 0) {
     await db.prepare('UPDATE sessions SET preview = ? WHERE id = ?').bind(original.slice(0, 100), sessionId).run()
   }
-  return { id, session_id: sessionId, position, original, translation }
+  return { id, session_id: sessionId, position: pos, original, translation }
 }
 
 export async function deleteSession(sessionId: string, deviceId: string, db: D1Database): Promise<boolean> {

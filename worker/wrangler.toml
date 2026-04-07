@@ -7,10 +7,14 @@ compatibility_flags = ["nodejs_compat"]
 ELEVENLABS_API_BASE = "https://api.elevenlabs.io"
 AWS_TRANSLATE_ENDPOINT = "https://translate.amazonaws.com"
 
+# Required secret: ENCRYPTION_KEY
+# Set with: wrangler secret put ENCRYPTION_KEY
+
 [[d1_databases]]
 binding = "DB"
 database_name = "notewriter-db"
 database_id = "placeholder-replace-after-creation"
+migrations_dir = "migrations"
 
 [[kv_namespaces]]
 binding = "KV"

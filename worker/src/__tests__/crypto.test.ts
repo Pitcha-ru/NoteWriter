@@ -13,11 +13,24 @@ describe('crypto', () => {
       expect(decrypted).toBe(plaintext)
     })
 
-    it('produces different ciphertext for same input (random IV)', async () => {
+    it('produces different ciphertext for same input (random IV and salt)', async () => {
       const plaintext = 'same input'
       const a = await encrypt(plaintext, masterKey)
       const b = await encrypt(plaintext, masterKey)
       expect(a).not.toBe(b)
+    })
+
+    it('uses a unique salt per encryption (first 16 bytes differ)', async () => {
+      const plaintext = 'salt test'
+      const a = Uint8Array.from(atob(await encrypt(plaintext, masterKey)), c => c.charCodeAt(0))
+      const b = Uint8Array.from(atob(await encrypt(plaintext, masterKey)), c => c.charCodeAt(0))
+      // salts (first 16 bytes) should differ
+      expect(Array.from(a.slice(0, 16))).not.toEqual(Array.from(b.slice(0, 16)))
+    })
+
+    it('wrong key fails to decrypt', async () => {
+      const encrypted = await encrypt('secret', masterKey)
+      await expect(decrypt(encrypted, 'wrong-key')).rejects.toThrow()
     })
   })
 

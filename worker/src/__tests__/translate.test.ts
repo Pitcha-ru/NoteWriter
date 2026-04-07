@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { buildTranslateRequest, parseTranslateResponse, LANG_CODES } from '../translate'
+import { describe, it, expect, vi } from 'vitest'
+import { buildTranslateRequest, parseTranslateResponse, LANG_CODES, translateText } from '../translate'
 
 describe('translate', () => {
   describe('LANG_CODES', () => {
@@ -26,5 +26,19 @@ describe('translate', () => {
     it('extracts translated text', () => {
       expect(parseTranslateResponse({ TranslatedText: 'Γεια σου κόσμε' })).toBe('Γεια σου κόσμε')
     })
+  })
+})
+
+describe('translateText', () => {
+  it('returns translated text on success', async () => {
+    // Mock fetch to return success
+    global.fetch = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ TranslatedText: 'Bonjour' })))
+    const result = await translateText('Hello', 'en', 'fr', 'key', 'secret', 'eu-west-1')
+    expect(result).toBe('Bonjour')
+  })
+
+  it('throws on API error', async () => {
+    global.fetch = vi.fn().mockResolvedValueOnce(new Response('Throttled', { status: 429 }))
+    await expect(translateText('Hello', 'en', 'fr', 'key', 'secret', 'eu-west-1')).rejects.toThrow('429')
   })
 })
