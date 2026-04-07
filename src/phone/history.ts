@@ -99,10 +99,12 @@ export function initHistory(api: ApiClient, showToast: ShowToast): void {
       ? escapeHtml(session.preview.slice(0, 60)) + (session.preview.length > 60 ? '...' : '')
       : 'Empty session'
 
+    const modeBadge = session.mode === 'dialogue' ? ' · Dialogue' : ''
+
     div.innerHTML = `
       <div class="session-info">
         <div class="session-preview">${preview}</div>
-        <div class="session-meta">${escapeHtml(formatDate(session.createdAt))}  ·  ${escapeHtml(langName(session.listenLang))} → ${escapeHtml(langName(session.translateLang))}</div>
+        <div class="session-meta">${escapeHtml(formatDate(session.createdAt))}  ·  ${escapeHtml(langName(session.listenLang))} → ${escapeHtml(langName(session.translateLang))}${modeBadge}</div>
       </div>
       <button class="session-delete" aria-label="Delete session">&#128465;</button>
       <span class="session-chevron">›</span>
