@@ -1,6 +1,7 @@
 import { Env, SettingsPayload } from './types'
 import { handleRegister, authenticate } from './auth'
-import { saveKeys, getMaskedKeys, deleteKeys } from './keys'
+import { saveKeys, getMaskedKeys, deleteKeys, getCachedKeys } from './keys'
+import { translateText } from './translate'
 import { getSettings, updateSettings } from './settings'
 import { createSession, listSessions, getSession, appendParagraph, deleteSession } from './sessions'
 
@@ -82,6 +83,22 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
       const result = await updateSettings(deviceId, body, env.DB)
       if (result.error) return json({ error: result.error }, 400)
       return json({ ok: true })
+    }
+  }
+
+  // Translate route
+  if (path === '/api/translate' && request.method === 'POST') {
+    const body = await request.json<{ text: string; source_lang: string; target_lang: string }>()
+    if (!body.text || !body.source_lang || !body.target_lang) {
+      return json({ error: 'text, source_lang, and target_lang required' }, 400)
+    }
+    const keys = await getCachedKeys(deviceId, env.KV, env.ENCRYPTION_KEY)
+    if (!keys) return json({ error: 'API keys not configured' }, 400)
+    try {
+      const translated = await translateText(body.text, body.source_lang, body.target_lang, keys.aws_access_key_id, keys.aws_secret_access_key, keys.aws_region)
+      return json({ translated_text: translated })
+    } catch (err) {
+      return json({ error: err instanceof Error ? err.message : 'Translation failed' }, 502)
     }
   }
 
