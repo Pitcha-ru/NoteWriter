@@ -1,0 +1,43 @@
+name: Deploy
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Install plugin dependencies
+        run: npm ci
+      - name: Install worker dependencies
+        run: cd worker && npm ci
+      - name: Run worker tests
+        run: cd worker && npm test
+      - name: Run plugin tests
+        run: npm test
+      - name: Build plugin
+        run: npm run build:plugin
+      - name: Install Even Hub CLI
+        run: npm install -g @evenrealities/evenhub-cli
+      - name: Pack plugin
+        run: evenhub pack app.json dist -o notewriter.ehpk
+      - name: Deploy worker
+        run: cd worker && npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Apply D1 migrations
+        run: cd worker && npx wrangler d1 migrations apply notewriter-db --remote
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Upload .ehpk artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: notewriter-ehpk
+          path: notewriter.ehpk

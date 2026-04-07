@@ -1,0 +1,26 @@
+name: PR Check
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Install plugin dependencies
+        run: npm ci
+      - name: Install worker dependencies
+        run: cd worker && npm ci
+      - name: Run worker tests
+        run: cd worker && npm test
+      - name: Run plugin tests
+        run: npm test
+      - name: Build plugin
+        run: npm run build:plugin
+      - name: Build worker (dry-run)
+        run: cd worker && npx wrangler deploy --dry-run --outdir=dist
