@@ -1,17 +1,16 @@
 // src/glasses/settings.ts
-import { createTextPage, formatMenuText, resetPageState } from './renderer'
+import { setPageContent, formatMenuText } from './renderer'
 import { appState } from '../services/state'
 import { ApiClient } from '../services/api'
 import type { Language } from '../types'
 
-const LANGUAGES: Language[] = ['en', 'el', 'fr', 'de']
-const LANGUAGE_LABELS: Record<Language, string> = { en: 'English', el: 'Greek', fr: 'French', de: 'German' }
+const LANGUAGES: Language[] = ['en', 'el', 'fr', 'de', 'ru']
+const LANGUAGE_LABELS: Record<Language, string> = { en: 'English', el: 'Greek', fr: 'French', de: 'German', ru: 'Russian' }
 
 let selectedIndex = 0
 
 export function showSettings(bridge: any): void {
   appState.navigateTo('settings')
-  resetPageState()
   selectedIndex = 0
   renderSettings(bridge)
 }
@@ -21,7 +20,7 @@ function renderSettings(bridge: any): void {
     `Listen: ${LANGUAGE_LABELS[appState.settings.listenLang]}`,
     `Translate: ${LANGUAGE_LABELS[appState.settings.translateLang]}`,
   ]
-  createTextPage(bridge, formatMenuText(items, selectedIndex))
+  setPageContent(bridge, formatMenuText(items, selectedIndex))
 }
 
 export function handleSettingsEvent(

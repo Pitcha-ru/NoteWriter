@@ -6,22 +6,19 @@ import {
   TextContainerUpgrade,
 } from '@evenrealities/even_hub_sdk'
 
-// Track whether the initial page has been created so we know which bridge call to use.
+// createStartUpPageContainer must be called exactly ONCE. After that, only rebuildPageContainer.
 let pageCreated = false
 
-/** Reset page state — call when navigating away and back in. */
-export function resetPageState(): void {
-  pageCreated = false
-}
-
 /**
- * Display a text page on the glasses.
- * First call uses createStartUpPageContainer; subsequent calls use rebuildPageContainer.
+ * Display/update a text page on the glasses.
+ * First call uses createStartUpPageContainer; all subsequent calls use rebuildPageContainer.
+ * Never resets — createStartUpPageContainer is called only once per app lifecycle.
  */
-export function createTextPage(bridge: any, content: string): void {
+export function setPageContent(bridge: any, content: string): void {
+  const truncated = content.length > 2000 ? content.slice(-2000) : content
   const textProp = new TextContainerProperty({
     containerID: 0,
-    content,
+    content: truncated,
     isEventCapture: 1,
     width: 576,
     height: 288,
@@ -93,6 +90,6 @@ export function formatHistoryDetail(
  */
 export function formatMenuText(items: string[], selectedIndex = 0): string {
   return items
-    .map((item, i) => (i === selectedIndex ? `▸ ${item}` : `  ${item}`))
+    .map((item, i) => (i === selectedIndex ? `> ${item}` : `  ${item}`))
     .join('\n')
 }

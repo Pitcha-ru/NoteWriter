@@ -1,5 +1,5 @@
 // Supported languages for STT + translation (Greek supported at service level)
-export type Language = "en" | "el" | "fr" | "de";
+export type Language = "en" | "el" | "fr" | "de" | "ru";
 
 export interface Settings {
   listenLang: Language;

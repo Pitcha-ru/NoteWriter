@@ -1,5 +1,5 @@
 // src/glasses/menu.ts
-import { createTextPage, formatMenuText, resetPageState } from './renderer'
+import { setPageContent, formatMenuText } from './renderer'
 import { appState } from '../services/state'
 
 const MENU_ITEMS = ['Listen', 'History', 'Settings']
@@ -8,7 +8,6 @@ let selectedIndex = 0
 
 export function showMenu(bridge: any): void {
   appState.navigateTo('menu')
-  resetPageState()
   selectedIndex = 0
   renderMenu(bridge)
 }
@@ -20,7 +19,7 @@ function renderMenu(bridge: any): void {
     }
     return text
   })
-  createTextPage(bridge, formatMenuText(items, selectedIndex))
+  setPageContent(bridge, formatMenuText(items, selectedIndex))
 }
 
 export function handleMenuEvent(

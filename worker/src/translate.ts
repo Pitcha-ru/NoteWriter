@@ -1,6 +1,6 @@
 import { AwsClient } from 'aws4fetch'
 
-export const LANG_CODES: Record<string, string> = { en: 'en', el: 'el', fr: 'fr', de: 'de' }
+export const LANG_CODES: Record<string, string> = { en: 'en', el: 'el', fr: 'fr', de: 'de', ru: 'ru' }
 
 export function buildTranslateRequest(text: string, sourceLang: string, targetLang: string) {
   if (sourceLang === targetLang) throw new Error('Source and target language must differ')

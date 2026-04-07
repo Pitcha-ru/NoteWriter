@@ -19,15 +19,21 @@ async function init() {
   appState.setDeviceId(deviceId)
 
   // Restore or create auth token
-  const storedToken = await bridge.getLocalStorage('auth_token')
+  // Try bridge storage first, fall back to localStorage (for phone UI sharing)
+  const storedToken = await bridge.getLocalStorage('auth_token') || localStorage.getItem('notewriter_auth_token')
   if (storedToken) {
     appState.setAuthToken(storedToken)
     api.setToken(storedToken)
+    // Sync to both storages
+    localStorage.setItem('notewriter_auth_token', storedToken)
+    await bridge.setLocalStorage('auth_token', storedToken)
   } else {
     try {
       const { token } = await api.register(deviceId)
       appState.setAuthToken(token)
       api.setToken(token)
+      // Save to both storages so phone UI can use it
+      localStorage.setItem('notewriter_auth_token', token)
       await bridge.setLocalStorage('auth_token', token)
     } catch (err) {
       console.error('Registration failed:', err)
@@ -45,9 +51,23 @@ async function init() {
 
   // Event handler
   bridge.onEvenHubEvent((event: any) => {
+
     if (event.audioEvent?.audioPcm) { handleAudioData(event.audioEvent.audioPcm); return }
 
-    const eventType = event.textEvent?.eventType ?? event.listEvent?.eventType
+    // Parse eventType from various event sources:
+    // - Up/Down come via textEvent.eventType (1/2)
+    // - Double Click comes via sysEvent.eventType (3)
+    // - Click comes via sysEvent with eventSource but NO eventType — treat as CLICK (0)
+    let eventType: number | undefined =
+      event.textEvent?.eventType ??
+      event.listEvent?.eventType ??
+      event.sysEvent?.eventType
+
+    // Click from simulator: sysEvent has eventSource but no eventType
+    if (eventType === undefined && event.sysEvent?.eventSource !== undefined) {
+      eventType = 0 // CLICK_EVENT
+    }
+
     const selectedIndex = event.listEvent?.selectedIndex ?? 0
     if (eventType === undefined) return
 

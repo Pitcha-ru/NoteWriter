@@ -1,5 +1,5 @@
 // src/glasses/history.ts
-import { createTextPage, formatHistoryDetail, resetPageState } from './renderer'
+import { setPageContent, formatHistoryDetail } from './renderer'
 import { appState } from '../services/state'
 import { ApiClient } from '../services/api'
 import type { Session, Paragraph } from '../types'
@@ -10,7 +10,6 @@ let currentParagraphIndex = 0
 
 export async function showHistoryList(bridge: any, api: ApiClient): Promise<void> {
   appState.navigateTo('history_list')
-  resetPageState()
   sessions = []
 
   try {
@@ -18,29 +17,28 @@ export async function showHistoryList(bridge: any, api: ApiClient): Promise<void
     sessions = response.sessions
 
     if (sessions.length === 0) {
-      createTextPage(bridge, 'No recordings yet.\nDouble-click to go back.')
+      setPageContent(bridge, 'No recordings yet.\nDouble-click to go back.')
     } else {
       const lines = sessions.map((s, i) => {
         const date = new Date(s.createdAt).toLocaleDateString()
         const preview = s.preview ? s.preview.slice(0, 40) : '(empty)'
         return `${i + 1}. ${date}: ${preview}`
       })
-      createTextPage(bridge, lines.join('\n'))
+      setPageContent(bridge, lines.join('\n'))
     }
   } catch {
-    createTextPage(bridge, 'Failed to load history.\nDouble-click to go back.')
+    setPageContent(bridge, 'Failed to load history.\nDouble-click to go back.')
   }
 }
 
 export async function showSessionDetail(bridge: any, api: ApiClient, sessionIndex: number): Promise<void> {
   appState.navigateTo('history_detail')
-  resetPageState()
   paragraphs = []
   currentParagraphIndex = 0
 
   const session = sessions[sessionIndex]
   if (!session) {
-    createTextPage(bridge, 'Session not found.\nDouble-click to go back.')
+    setPageContent(bridge, 'Session not found.\nDouble-click to go back.')
     return
   }
 
@@ -49,19 +47,19 @@ export async function showSessionDetail(bridge: any, api: ApiClient, sessionInde
     paragraphs = response.paragraphs
 
     if (paragraphs.length === 0) {
-      createTextPage(bridge, 'No content in this session.\nDouble-click to go back.')
+      setPageContent(bridge, 'No content in this session.\nDouble-click to go back.')
     } else {
       renderParagraph(bridge)
     }
   } catch {
-    createTextPage(bridge, 'Failed to load session.\nDouble-click to go back.')
+    setPageContent(bridge, 'Failed to load session.\nDouble-click to go back.')
   }
 }
 
 function renderParagraph(bridge: any): void {
   const text = formatHistoryDetail(paragraphs, currentParagraphIndex)
   const indicator = `${currentParagraphIndex + 1}/${paragraphs.length}`
-  createTextPage(bridge, `${indicator}\n\n${text}`)
+  setPageContent(bridge, `${indicator}\n\n${text}`)
 }
 
 export function handleHistoryListEvent(

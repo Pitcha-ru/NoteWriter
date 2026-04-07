@@ -1,5 +1,5 @@
 // src/glasses/listen.ts
-import { createTextPage, updateText, formatListenDisplay, resetPageState } from './renderer'
+import { setPageContent, updateText, formatListenDisplay } from './renderer'
 import { appState } from '../services/state'
 import { SttClient } from '../services/stt'
 import { ApiClient } from '../services/api'
@@ -60,10 +60,9 @@ export async function startListening(bridge: any, api: ApiClient): Promise<void>
   currentBridge = bridge
   currentApi = api
   resetListenState()
-  resetPageState()
 
   // Show initial display
-  createTextPage(bridge, 'Starting...')
+  setPageContent(bridge, 'Starting...')
 
   try {
     // Create session on server

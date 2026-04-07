@@ -33,7 +33,7 @@ export default {
   },
 } satisfies ExportedHandler<Env>
 
-const VALID_LANGS = new Set(['en', 'el', 'fr', 'de'])
+const VALID_LANGS = new Set(['en', 'el', 'fr', 'de', 'ru'])
 
 async function handleRequest(request: Request, env: Env, path: string, url: URL): Promise<Response> {
   // Fix 7: Fail fast if ENCRYPTION_KEY is not configured.
@@ -144,7 +144,7 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
         return json({ error: 'listen_lang and translate_lang required' }, 400)
       }
       if (!VALID_LANGS.has(body.listen_lang) || !VALID_LANGS.has(body.translate_lang)) {
-        return json({ error: 'Invalid language. Allowed: en, el, fr, de' }, 400)
+        return json({ error: 'Invalid language. Allowed: en, el, fr, de, ru' }, 400)
       }
       const session = await createSession(deviceId, body.listen_lang, body.translate_lang, env.DB)
       return json(session, 201)

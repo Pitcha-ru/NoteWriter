@@ -24,7 +24,7 @@ function formatDate(iso: string): string {
 }
 
 const LANG_NAMES: Record<string, string> = {
-  en: 'English', el: 'Greek', fr: 'French', de: 'German',
+  en: 'English', el: 'Greek', fr: 'French', de: 'German', ru: 'Russian',
 }
 
 function langName(code: string): string {
@@ -86,13 +86,15 @@ export function initHistory(api: ApiClient, showToast: ShowToast): void {
     div.className = 'session-item'
 
     const preview = session.preview
-      ? escapeHtml(session.preview.slice(0, 80)) + (session.preview.length > 80 ? '…' : '')
-      : '<em style="color:#8e8e93">No content</em>'
+      ? escapeHtml(session.preview.slice(0, 60)) + (session.preview.length > 60 ? '...' : '')
+      : 'Empty session'
 
     div.innerHTML = `
-      <div class="session-date">${escapeHtml(formatDate(session.createdAt))}</div>
-      <div class="session-preview">${preview}</div>
-      <div class="session-langs">${escapeHtml(langName(session.listenLang))} → ${escapeHtml(langName(session.translateLang))}</div>
+      <div class="session-info">
+        <div class="session-preview">${preview}</div>
+        <div class="session-meta">${escapeHtml(formatDate(session.createdAt))}  ·  ${escapeHtml(langName(session.listenLang))} → ${escapeHtml(langName(session.translateLang))}</div>
+      </div>
+      <span class="session-chevron">›</span>
     `
 
     div.addEventListener('click', () => {
