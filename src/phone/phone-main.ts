@@ -3,7 +3,7 @@ import { initKeys } from './keys'
 import { initHistory } from './history'
 import { initSettings } from './settings'
 
-const WORKER_URL = 'https://notewriter-worker.YOUR_SUBDOMAIN.workers.dev'
+const WORKER_URL = 'https://notewriter-worker.kiwibudka.workers.dev'
 
 export const api = new ApiClient(WORKER_URL)
 

@@ -1,6 +1,7 @@
 name = "notewriter-worker"
 main = "src/index.ts"
 compatibility_date = "2024-05-12"
+account_id = "0ce52a09257970d90db323630700c5ef"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
@@ -13,9 +14,9 @@ AWS_TRANSLATE_ENDPOINT = "https://translate.amazonaws.com"
 [[d1_databases]]
 binding = "DB"
 database_name = "notewriter-db"
-database_id = "placeholder-replace-after-creation"
+database_id = "fcf764ba-f42f-44c0-9c6f-5f56d12d2a51"
 migrations_dir = "migrations"
 
 [[kv_namespaces]]
 binding = "KV"
-id = "placeholder-replace-after-creation"
+id = "1d4ec79f45454eaabbcb2777665e1939"

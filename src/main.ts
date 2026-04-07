@@ -6,7 +6,7 @@ import { startListening, handleListenEvent, handleAudioData } from './glasses/li
 import { showHistoryList, handleHistoryListEvent, handleHistoryDetailEvent } from './glasses/history'
 import { showSettings, handleSettingsEvent } from './glasses/settings'
 
-const WORKER_URL = 'https://notewriter-worker.YOUR_SUBDOMAIN.workers.dev'
+const WORKER_URL = 'https://notewriter-worker.kiwibudka.workers.dev'
 const api = new ApiClient(WORKER_URL)
 
 async function init() {
