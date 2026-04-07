@@ -1,50 +1,64 @@
 // src/glasses/renderer.ts
-// NOTE: The actual SDK types may differ - use 'any' for bridge parameter types since we can't
-// verify exact SDK API without hardware. These are best-effort based on documentation.
+import {
+  CreateStartUpPageContainer,
+  RebuildPageContainer,
+  TextContainerProperty,
+  TextContainerUpgrade,
+} from '@evenrealities/even_hub_sdk'
 
-export interface TextDisplayConfig {
-  text: string
-  xPosition?: number
-  yPosition?: number
-  width?: number
-  height?: number
-  isEventCapture?: boolean
+// Track whether the initial page has been created so we know which bridge call to use.
+let pageCreated = false
+
+/** Reset page state — call when navigating away and back in. */
+export function resetPageState(): void {
+  pageCreated = false
 }
 
-export function createTextPage(bridge: any, configs: TextDisplayConfig[]): void {
-  const containers = configs.map((c, i) => ({
-    type: 'text' as const,
-    properties: {
-      xPosition: c.xPosition ?? 0,
-      yPosition: c.yPosition ?? 0,
-      width: c.width ?? 576,
-      height: c.height ?? 288,
-      text: c.text,
-      isEventCapture: c.isEventCapture ? 1 : 0,
-    },
-    id: i,
-  }))
-  bridge.createStartUpPageContainer(containers)
+/**
+ * Display a text page on the glasses.
+ * First call uses createStartUpPageContainer; subsequent calls use rebuildPageContainer.
+ */
+export function createTextPage(bridge: any, content: string): void {
+  const textProp = new TextContainerProperty({
+    containerID: 0,
+    content,
+    isEventCapture: 1,
+    width: 576,
+    height: 288,
+  })
+
+  if (!pageCreated) {
+    pageCreated = true
+    bridge.createStartUpPageContainer(
+      new CreateStartUpPageContainer({
+        containerTotalNum: 1,
+        textObject: [textProp],
+      })
+    )
+  } else {
+    bridge.rebuildPageContainer(
+      new RebuildPageContainer({
+        containerTotalNum: 1,
+        textObject: [textProp],
+      })
+    )
+  }
 }
 
+/**
+ * Incrementally update the text of a container that has already been created.
+ */
 export function updateText(bridge: any, containerId: number, text: string): void {
   const truncated = text.length > 2000 ? text.slice(-2000) : text
-  bridge.textContainerUpgrade(containerId, { text: truncated })
+  bridge.textContainerUpgrade(
+    new TextContainerUpgrade({
+      containerID: containerId,
+      content: truncated,
+    })
+  )
 }
 
-export interface ListItem { text: string }
-
-export function createListPage(bridge: any, items: ListItem[], eventCaptureId = 0): void {
-  const container = {
-    type: 'list' as const,
-    properties: {
-      items: items.map(item => ({ text: item.text.slice(0, 64) })),
-      isEventCapture: 1,
-    },
-    id: eventCaptureId,
-  }
-  bridge.createStartUpPageContainer([container])
-}
+// ── Helpers for formatting display text ───────────────────────────────────────
 
 export function formatListenDisplay(
   committedPairs: Array<{ original: string; translation: string }>,
@@ -68,4 +82,17 @@ export function formatHistoryDetail(
   const p = paragraphs[currentIndex]
   if (!p) return ''
   return `${p.original}\n\n${p.translation}`
+}
+
+/**
+ * Render a list of items as formatted text with a cursor indicator.
+ * Example:
+ *   ▸ Listen
+ *     History
+ *     Settings
+ */
+export function formatMenuText(items: string[], selectedIndex = 0): string {
+  return items
+    .map((item, i) => (i === selectedIndex ? `▸ ${item}` : `  ${item}`))
+    .join('\n')
 }

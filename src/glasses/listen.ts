@@ -1,5 +1,5 @@
 // src/glasses/listen.ts
-import { createTextPage, updateText, formatListenDisplay } from './renderer'
+import { createTextPage, updateText, formatListenDisplay, resetPageState } from './renderer'
 import { appState } from '../services/state'
 import { SttClient } from '../services/stt'
 import { ApiClient } from '../services/api'
@@ -60,11 +60,10 @@ export async function startListening(bridge: any, api: ApiClient): Promise<void>
   currentBridge = bridge
   currentApi = api
   resetListenState()
+  resetPageState()
 
   // Show initial display
-  createTextPage(bridge, [
-    { text: 'Starting...', xPosition: 0, yPosition: 0, width: 576, height: 288, isEventCapture: true },
-  ])
+  createTextPage(bridge, 'Starting...')
 
   try {
     // Create session on server
@@ -117,7 +116,7 @@ export async function startListening(bridge: any, api: ApiClient): Promise<void>
     bridge.audioControl(true)
 
     updateText(bridge, DISPLAY_ID, formatListenDisplay([], ''))
-  } catch (err) {
+  } catch {
     updateText(bridge, DISPLAY_ID, 'Error starting session.\nDouble-click to go back.')
   }
 }
@@ -139,7 +138,9 @@ export function handleAudioData(pcmData: ArrayBuffer): void {
 }
 
 function stopListening(): void {
-  if (currentBridge) bridge_audioControl(currentBridge, false)
+  if (currentBridge) {
+    try { currentBridge.audioControl(false) } catch { /* ignore */ }
+  }
   flushParagraph()
   sttClient?.disconnect()
   sttClient = null
@@ -147,9 +148,4 @@ function stopListening(): void {
     clearTimeout(silenceTimer)
     silenceTimer = null
   }
-}
-
-// Helper to avoid closing over bridge before it's set
-function bridge_audioControl(bridge: any, enabled: boolean): void {
-  try { bridge.audioControl(enabled) } catch { /* ignore */ }
 }
