@@ -18,10 +18,10 @@ async function loadMaskedKeys(api: ApiClient): Promise<void> {
 
   try {
     const masked: MaskedKeys = await api.getKeys()
-    inputs.elevenlabs.placeholder = maskPlaceholder(masked.elevenlabs_key)    || 'Not set'
-    inputs.awsAccess.placeholder  = maskPlaceholder(masked.aws_access_key_id)  || 'Not set'
-    inputs.awsSecret.placeholder  = maskPlaceholder(masked.aws_secret_access_key) || 'Not set'
-    inputs.awsRegion.placeholder  = masked.aws_region ?? 'Not set'
+    inputs.elevenlabs.placeholder = maskPlaceholder(masked.elevenlabsKey)    || 'Not set'
+    inputs.awsAccess.placeholder  = maskPlaceholder(masked.awsAccessKeyId)  || 'Not set'
+    inputs.awsSecret.placeholder  = maskPlaceholder(masked.awsSecretAccessKey) || 'Not set'
+    inputs.awsRegion.placeholder  = masked.awsRegion ?? 'Not set'
   } catch {
     // silently ignore — placeholders stay empty
   }
@@ -55,10 +55,10 @@ export function initKeys(api: ApiClient, showToast: ShowToast): void {
 
     try {
       await api.saveKeys({
-        elevenlabs_key:       elevenlabs,
-        aws_access_key_id:    awsAccess,
-        aws_secret_access_key: awsSecret,
-        aws_region:            awsRegion,
+        elevenlabsKey:       elevenlabs,
+        awsAccessKeyId:      awsAccess,
+        awsSecretAccessKey:  awsSecret,
+        awsRegion:           awsRegion,
       })
 
       // Clear fields

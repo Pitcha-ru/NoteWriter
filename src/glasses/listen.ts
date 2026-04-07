@@ -115,8 +115,9 @@ export async function startListening(bridge: any, api: ApiClient): Promise<void>
     bridge.audioControl(true)
 
     updateText(bridge, DISPLAY_ID, formatListenDisplay([], ''))
-  } catch {
-    updateText(bridge, DISPLAY_ID, 'Error starting session.\nDouble-click to go back.')
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    updateText(bridge, DISPLAY_ID, `Error: ${msg}\nDouble-click to go back.`)
   }
 }
 

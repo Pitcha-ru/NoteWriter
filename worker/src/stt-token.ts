@@ -1,7 +1,7 @@
 export function buildTokenRequest(apiKey: string, apiBase: string): { url: string; options: { method: string; headers: Record<string, string> } } {
   return {
-    url: `${apiBase}/v1/speech-to-text/get-websocket-token`,
-    options: { method: 'GET', headers: { 'xi-api-key': apiKey } },
+    url: `${apiBase}/v1/single-use-token/realtime_scribe`,
+    options: { method: 'POST', headers: { 'xi-api-key': apiKey } },
   }
 }
 

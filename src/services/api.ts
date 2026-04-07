@@ -1,5 +1,28 @@
 import type { Settings, Session, Paragraph, SessionListResponse, SessionDetailResponse, MaskedKeys, ApiKeys } from '../types'
 
+// Convert snake_case keys to camelCase (one level deep)
+function toCamel(obj: any): any {
+  if (Array.isArray(obj)) return obj.map(toCamel)
+  if (obj === null || typeof obj !== 'object') return obj
+  const out: any = {}
+  for (const key of Object.keys(obj)) {
+    const camel = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase())
+    out[camel] = obj[key]
+  }
+  return out
+}
+
+// Convert camelCase keys to snake_case (one level deep)
+function toSnake(obj: any): any {
+  if (obj === null || typeof obj !== 'object') return obj
+  const out: any = {}
+  for (const key of Object.keys(obj)) {
+    const snake = key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)
+    out[snake] = obj[key]
+  }
+  return out
+}
+
 export class ApiClient {
   private baseUrl: string
   private token: string | null = null
@@ -23,7 +46,8 @@ export class ApiClient {
       const body = await response.json().catch(() => ({ error: 'Request failed' })) as { error: string }
       throw new Error(body.error)
     }
-    return response.json() as Promise<T>
+    const data = await response.json()
+    return toCamel(data) as T
   }
 
   async register(deviceId: string): Promise<{ token: string }> {
@@ -33,10 +57,10 @@ export class ApiClient {
     return this.request('/api/stt-token', { method: 'POST' })
   }
   async translate(text: string, sourceLang: string, targetLang: string): Promise<string> {
-    const r = await this.request<{ translated_text: string }>('/api/translate', {
+    const r = await this.request<{ translatedText: string }>('/api/translate', {
       method: 'POST', body: JSON.stringify({ text, source_lang: sourceLang, target_lang: targetLang }),
     })
-    return r.translated_text
+    return r.translatedText
   }
   async listSessions(cursor?: string, limit = 20): Promise<SessionListResponse> {
     const p = new URLSearchParams({ limit: String(limit) })
@@ -56,7 +80,7 @@ export class ApiClient {
   }
   async deleteSession(id: string): Promise<void> { await this.request(`/api/sessions/${id}`, { method: 'DELETE' }) }
   async getKeys(): Promise<MaskedKeys> { return this.request('/api/keys') }
-  async saveKeys(keys: ApiKeys): Promise<void> { await this.request('/api/keys', { method: 'PUT', body: JSON.stringify(keys) }) }
+  async saveKeys(keys: ApiKeys): Promise<void> { await this.request('/api/keys', { method: 'PUT', body: JSON.stringify(toSnake(keys)) }) }
   async deleteKeys(): Promise<void> { await this.request('/api/keys', { method: 'DELETE' }) }
   async getSettings(): Promise<Settings> { return this.request('/api/settings') }
   async saveSettings(settings: Settings): Promise<void> { await this.request('/api/settings', { method: 'PUT', body: JSON.stringify(settings) }) }

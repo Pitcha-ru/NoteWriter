@@ -44,7 +44,7 @@ async function init() {
   try { const s = await api.getSettings(); appState.updateSettings(s) } catch {}
   try {
     const k = await api.getKeys()
-    appState.setKeysConfigured(k.elevenlabs_key !== null && k.aws_access_key_id !== null)
+    appState.setKeysConfigured(k.elevenlabsKey !== null && k.awsAccessKeyId !== null)
   } catch {}
 
   showMenu(bridge)
@@ -53,7 +53,7 @@ async function init() {
   window.addEventListener('notewriter:keys-changed', async () => {
     try {
       const k = await api.getKeys()
-      appState.setKeysConfigured(k.elevenlabs_key !== null && k.aws_access_key_id !== null)
+      appState.setKeysConfigured(k.elevenlabsKey !== null && k.awsAccessKeyId !== null)
       // Refresh menu if we're on it (to update Listen availability)
       if (appState.currentScreen === 'menu') showMenu(bridge)
     } catch {}
@@ -91,7 +91,7 @@ async function init() {
     // FOREGROUND_ENTER
     if (eventType === 4) {
       api.getSettings().then(s => appState.updateSettings(s)).catch(() => {})
-      api.getKeys().then(k => appState.setKeysConfigured(k.elevenlabs_key !== null && k.aws_access_key_id !== null)).catch(() => {})
+      api.getKeys().then(k => appState.setKeysConfigured(k.elevenlabsKey !== null && k.awsAccessKeyId !== null)).catch(() => {})
       return
     }
 

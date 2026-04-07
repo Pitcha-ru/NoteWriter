@@ -35,15 +35,15 @@ export interface SessionDetailResponse {
 }
 
 export interface MaskedKeys {
-  elevenlabs_key: string | null;
-  aws_access_key_id: string | null;
-  aws_secret_access_key: string | null;
-  aws_region: string | null;
+  elevenlabsKey: string | null;
+  awsAccessKeyId: string | null;
+  awsSecretAccessKey: string | null;
+  awsRegion: string | null;
 }
 
 export interface ApiKeys {
-  elevenlabs_key: string;
-  aws_access_key_id: string;
-  aws_secret_access_key: string;
-  aws_region: string;
+  elevenlabsKey: string;
+  awsAccessKeyId: string;
+  awsSecretAccessKey: string;
+  awsRegion: string;
 }
