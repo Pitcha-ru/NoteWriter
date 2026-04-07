@@ -12,7 +12,9 @@ export function parseTranslateResponse(response: { TranslatedText: string }): st
 }
 
 export async function translateText(text: string, sourceLang: string, targetLang: string, awsAccessKeyId: string, awsSecretAccessKey: string, awsRegion: string): Promise<string> {
-  const client = new AwsClient({ accessKeyId: awsAccessKeyId, secretAccessKey: awsSecretAccessKey, region: awsRegion, service: 'translate' })
+  // retries: 0 — the caller (index.ts) handles errors and retrying inside a
+  // Worker would waste CPU time and delay the response.
+  const client = new AwsClient({ accessKeyId: awsAccessKeyId, secretAccessKey: awsSecretAccessKey, region: awsRegion, service: 'translate', retries: 0 })
   const body = buildTranslateRequest(text, sourceLang, targetLang)
   const response = await client.fetch(`https://translate.${awsRegion}.amazonaws.com/`, {
     method: 'POST',

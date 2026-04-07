@@ -35,7 +35,13 @@ function mask(value: string): string {
   return '****' + value.slice(-3)
 }
 
-// In-memory cache for decrypted keys (TTL: 5 minutes)
+// In-memory cache for decrypted keys (TTL: 5 minutes).
+// CAVEAT: Cloudflare Workers isolates can be evicted at any time (e.g. after
+// periods of low traffic or during platform maintenance). Each new isolate
+// starts with an empty cache, so this optimisation is best-effort and may
+// provide zero benefit under low traffic conditions. Do not rely on it for
+// correctness — it is purely a performance hint to avoid redundant KV reads
+// during the lifetime of a single isolate.
 interface CacheEntry { keys: KeysPayload; expiresAt: number }
 const cache = new Map<string, CacheEntry>()
 const CACHE_TTL_MS = 5 * 60 * 1000
