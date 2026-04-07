@@ -57,28 +57,77 @@ export function updateText(bridge: any, containerId: number, text: string): void
 
 // ── Helpers for formatting display text ───────────────────────────────────────
 
-export function formatListenDisplay(
-  committedPairs: Array<{ original: string; translation: string }>,
-  partialText: string
-): string {
-  const recent = committedPairs.slice(-2)
-  const lines: string[] = []
-  for (const pair of recent) {
-    lines.push(pair.original)
-    lines.push(pair.translation)
-    lines.push('')
-  }
-  if (partialText) lines.push(partialText)
-  return lines.join('\n')
+// Approximate max lines that fit on 576x288 display without scroll
+const MAX_DISPLAY_LINES = 9
+// Approximate chars per line on the display
+const CHARS_PER_LINE = 38
+
+function estimateLines(text: string): number {
+  if (!text) return 0
+  return text.split('\n').reduce((acc, line) => acc + Math.max(1, Math.ceil(line.length / CHARS_PER_LINE)), 0)
 }
 
+export function formatListenDisplay(
+  committedPairs: Array<{ original: string; translation: string }>,
+  partialText: string,
+  indicatorDot: string
+): string {
+  // Build from bottom up: partial text first, then as many committed pairs as fit
+  const parts: string[] = []
+  let linesUsed = 0
+
+  // Reserve space for partial text + indicator dot on first line
+  if (partialText) {
+    const partialBlock = `${indicatorDot} ${partialText}`
+    linesUsed += estimateLines(partialBlock)
+    parts.unshift(partialBlock)
+  } else {
+    parts.unshift(`${indicatorDot}`)
+    linesUsed += 1
+  }
+
+  // Add committed pairs from newest to oldest, as many as fit
+  for (let i = committedPairs.length - 1; i >= 0; i--) {
+    const pair = committedPairs[i]
+    const block = pair.translation
+      ? `${pair.original}\n${pair.translation}`
+      : pair.original
+    const blockLines = estimateLines(block) + 1 // +1 for separator line
+    if (linesUsed + blockLines > MAX_DISPLAY_LINES) break
+    linesUsed += blockLines
+    parts.unshift(block)
+  }
+
+  return parts.join('\n')
+}
+
+/**
+ * Show as many paragraphs as fit on screen starting from currentIndex.
+ * Returns the formatted text and how many paragraphs were shown.
+ */
 export function formatHistoryDetail(
   paragraphs: Array<{ original: string; translation: string }>,
   currentIndex: number
-): string {
-  const p = paragraphs[currentIndex]
-  if (!p) return ''
-  return `${p.original}\n\n${p.translation}`
+): { text: string; shown: number } {
+  if (!paragraphs[currentIndex]) return { text: '', shown: 0 }
+
+  const parts: string[] = []
+  let linesUsed = 1 // reserve 1 line for page indicator
+  let count = 0
+
+  for (let i = currentIndex; i < paragraphs.length; i++) {
+    const p = paragraphs[i]
+    const block = p.translation
+      ? `${p.original}\n${p.translation}`
+      : p.original
+    const blockLines = estimateLines(block) + (parts.length > 0 ? 1 : 0) // +1 separator between blocks
+    if (linesUsed + blockLines > MAX_DISPLAY_LINES && count > 0) break
+    linesUsed += blockLines
+    parts.push(block)
+    count++
+  }
+
+  return { text: parts.join('\n\n'), shown: count }
 }
 
 /**

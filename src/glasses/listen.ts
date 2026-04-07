@@ -31,28 +31,40 @@ function resetListenState(): void {
   if (indicatorTimer !== null) { clearInterval(indicatorTimer); indicatorTimer = null }
 }
 
+// Filter out non-speech sounds like (sound of falling), [music], etc.
+function isNoise(text: string): boolean {
+  const t = text.trim()
+  if (!t) return true
+  // Matches text wrapped in parentheses, brackets, or similar
+  if (/^\(.*\)$/.test(t)) return true
+  if (/^\[.*\]$/.test(t)) return true
+  if (/^\{.*\}$/.test(t)) return true
+  // Common noise markers
+  if (/^[*].*[*]$/.test(t)) return true
+  return false
+}
+
 function buildDisplayText(): string {
   if (listenState === 'paused') {
-    let text = '|| PAUSED\n\nClick to resume\nDouble-click to exit'
+    let text = '|| PAUSED\nClick = resume\nDouble-click = exit'
     if (committedPairs.length > 0) {
       const last = committedPairs[committedPairs.length - 1]
-      text += `\n\nLast: ${last.original.slice(0, 50)}`
+      text += `\n\n${last.original.slice(0, 60)}`
       if (last.translation && !last.translation.startsWith('[ERR')) {
-        text += `\n${last.translation.slice(0, 50)}`
+        text += `\n${last.translation.slice(0, 60)}`
       }
     }
     return text
   }
 
-  const dots = '.'.repeat((indicatorFrame % 3) + 1).padEnd(3)
-  const status = `Listening ${dots}`
+  // Blinking dot indicator
+  const dot = indicatorFrame % 2 === 0 ? '*' : ' '
 
   if (committedPairs.length === 0 && !partialText) {
-    return `${status}\n\nSpeak now...`
+    return `${dot} Speak now...`
   }
 
-  const content = formatListenDisplay(committedPairs, partialText)
-  return `${status}\n\n${content}`
+  return formatListenDisplay(committedPairs, partialText, dot)
 }
 
 function updateDisplay(): void {
@@ -167,12 +179,14 @@ export async function startListening(bridge: any, api: ApiClient): Promise<void>
     sttClient = new SttClient(token, { language: appState.settings.listenLang })
 
     sttClient.onPartialTranscript((text) => {
+      if (isNoise(text)) return
       partialText = text
       updateDisplay()
     })
 
     sttClient.onCommittedTranscript((text) => {
       partialText = ''
+      if (isNoise(text)) return
       const sourceLang = appState.settings.listenLang
       const targetLang = appState.settings.translateLang
 

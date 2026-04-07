@@ -90,10 +90,14 @@ export function handleHistoryListEvent(
 
 // ── Session detail (scroll through paragraphs) ──────────────────────────────
 
+let lastShown = 1 // how many paragraphs were shown on last render
+
 function renderParagraph(bridge: any): void {
-  const text = formatHistoryDetail(paragraphs, currentParagraphIndex)
-  const indicator = `${currentParagraphIndex + 1}/${paragraphs.length}`
-  updateText(bridge, DISPLAY_ID, `${indicator}\n\n${text}`)
+  const { text, shown } = formatHistoryDetail(paragraphs, currentParagraphIndex)
+  lastShown = Math.max(shown, 1)
+  const endIdx = Math.min(currentParagraphIndex + lastShown, paragraphs.length)
+  const indicator = `${currentParagraphIndex + 1}-${endIdx}/${paragraphs.length}`
+  updateText(bridge, DISPLAY_ID, `${indicator}\n${text}`)
 }
 
 export async function showSessionDetail(bridge: any, api: ApiClient, sessionIndex: number): Promise<void> {
@@ -133,15 +137,15 @@ export function handleHistoryDetailEvent(
     case 3: // DOUBLE_CLICK — back to list
       onBack()
       break
-    case 1: // UP — previous paragraph
+    case 1: // UP — previous page
       if (currentParagraphIndex > 0) {
-        currentParagraphIndex--
+        currentParagraphIndex = Math.max(0, currentParagraphIndex - lastShown)
         renderParagraph(bridge)
       }
       break
-    case 2: // DOWN — next paragraph
-      if (currentParagraphIndex < paragraphs.length - 1) {
-        currentParagraphIndex++
+    case 2: // DOWN — next page
+      if (currentParagraphIndex + lastShown < paragraphs.length) {
+        currentParagraphIndex += lastShown
         renderParagraph(bridge)
       }
       break
