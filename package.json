@@ -1,0 +1,21 @@
+{
+  "name": "notewriter",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build:plugin": "vite build",
+    "build:worker": "cd worker && npm run build",
+    "build": "npm run build:plugin && npm run build:worker",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@evenrealities/even_hub_sdk": "latest"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vite": "^5.2.0",
+    "vitest": "^1.5.0"
+  }
+}
