@@ -24,8 +24,8 @@ export interface KeysPayload {
 }
 
 export interface SettingsPayload {
-  listenLang: string;
-  translateLang: string;
+  listen_lang: string;
+  translate_lang: string;
 }
 
 export interface MaskedKeys {

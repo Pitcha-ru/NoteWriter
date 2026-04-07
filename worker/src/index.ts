@@ -1,6 +1,7 @@
-import { Env } from './types'
+import { Env, SettingsPayload } from './types'
 import { handleRegister, authenticate } from './auth'
 import { saveKeys, getMaskedKeys, deleteKeys } from './keys'
+import { getSettings, updateSettings } from './settings'
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -65,6 +66,20 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
     }
     if (request.method === 'DELETE') {
       await deleteKeys(deviceId, env.KV)
+      return json({ ok: true })
+    }
+  }
+
+  // Settings routes
+  if (path === '/api/settings') {
+    if (request.method === 'GET') {
+      const settings = await getSettings(deviceId, env.DB)
+      return json(settings ?? { listen_lang: 'en', translate_lang: 'el' })
+    }
+    if (request.method === 'PUT') {
+      const body = await request.json<SettingsPayload>()
+      const result = await updateSettings(deviceId, body, env.DB)
+      if (result.error) return json({ error: result.error }, 400)
       return json({ ok: true })
     }
   }
