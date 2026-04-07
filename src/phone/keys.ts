@@ -1,0 +1,79 @@
+import type { ApiClient } from '../services/api'
+import type { MaskedKeys } from '../types'
+
+type ShowToast = (message: string, isError?: boolean) => void
+
+function maskPlaceholder(masked: string | null): string {
+  if (!masked) return ''
+  return masked  // server already returns e.g. "****xyz"
+}
+
+async function loadMaskedKeys(api: ApiClient): Promise<void> {
+  const inputs = {
+    elevenlabs: document.getElementById('key-elevenlabs') as HTMLInputElement,
+    awsAccess:  document.getElementById('key-aws-access')  as HTMLInputElement,
+    awsSecret:  document.getElementById('key-aws-secret')  as HTMLInputElement,
+    awsRegion:  document.getElementById('key-aws-region')  as HTMLInputElement,
+  }
+
+  try {
+    const masked: MaskedKeys = await api.getKeys()
+    inputs.elevenlabs.placeholder = maskPlaceholder(masked.elevenlabs_key)    || 'Not set'
+    inputs.awsAccess.placeholder  = maskPlaceholder(masked.aws_access_key_id)  || 'Not set'
+    inputs.awsSecret.placeholder  = maskPlaceholder(masked.aws_secret_access_key) || 'Not set'
+    inputs.awsRegion.placeholder  = masked.aws_region ?? 'Not set'
+  } catch {
+    // silently ignore — placeholders stay empty
+  }
+}
+
+export function initKeys(api: ApiClient, showToast: ShowToast): void {
+  const saveBtn = document.getElementById('keys-save-btn') as HTMLButtonElement
+
+  const inputs = {
+    elevenlabs: document.getElementById('key-elevenlabs') as HTMLInputElement,
+    awsAccess:  document.getElementById('key-aws-access')  as HTMLInputElement,
+    awsSecret:  document.getElementById('key-aws-secret')  as HTMLInputElement,
+    awsRegion:  document.getElementById('key-aws-region')  as HTMLInputElement,
+  }
+
+  // Load masked placeholders on init
+  void loadMaskedKeys(api)
+
+  saveBtn.addEventListener('click', async () => {
+    const elevenlabs = inputs.elevenlabs.value.trim()
+    const awsAccess  = inputs.awsAccess.value.trim()
+    const awsSecret  = inputs.awsSecret.value.trim()
+    const awsRegion  = inputs.awsRegion.value.trim()
+
+    if (!elevenlabs && !awsAccess && !awsSecret && !awsRegion) {
+      showToast('Enter at least one key to save.', true)
+      return
+    }
+
+    saveBtn.disabled = true
+
+    try {
+      await api.saveKeys({
+        elevenlabs_key:       elevenlabs,
+        aws_access_key_id:    awsAccess,
+        aws_secret_access_key: awsSecret,
+        aws_region:            awsRegion,
+      })
+
+      // Clear fields
+      inputs.elevenlabs.value = ''
+      inputs.awsAccess.value  = ''
+      inputs.awsSecret.value  = ''
+      inputs.awsRegion.value  = ''
+
+      showToast('Keys saved.')
+      // Refresh masked placeholders
+      await loadMaskedKeys(api)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to save keys.', true)
+    } finally {
+      saveBtn.disabled = false
+    }
+  })
+}
