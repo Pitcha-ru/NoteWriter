@@ -1,4 +1,4 @@
-import type { Settings, Session, Paragraph, SessionListResponse, SessionDetailResponse, MaskedKeys, ApiKeys } from '../types'
+import type { Settings, Session, Paragraph, SessionListResponse, SessionDetailResponse, MaskedKeys, ApiKeys, DialogueMessage } from '../types'
 
 // Convert snake_case keys to camelCase (recursive)
 function toCamel(obj: any): any {
@@ -72,8 +72,56 @@ export class ApiClient {
     if (cursor !== undefined) p.set('cursor', String(cursor))
     return this.request(`/api/sessions/${id}?${p}`)
   }
-  async createSession(listenLang: string, translateLang: string): Promise<Session> {
-    return this.request('/api/sessions', { method: 'POST', body: JSON.stringify({ listen_lang: listenLang, translate_lang: translateLang }) })
+  async createSession(listenLang: string, translateLang: string, mode: string = 'listen'): Promise<Session> {
+    return this.request('/api/sessions', { method: 'POST', body: JSON.stringify({ listen_lang: listenLang, translate_lang: translateLang, mode }) })
+  }
+
+  async generateDialogue(
+    messages: DialogueMessage[],
+    context: string,
+    persona: string,
+    sourceLang: string,
+    targetLang: string
+  ): Promise<{ response: string; translation: string }> {
+    const res = await fetch(`${this.baseUrl}/api/dialogue/generate`, {
+      method: 'POST',
+      headers: this.headers(),
+      body: JSON.stringify({ messages, context, persona, source_lang: sourceLang, target_lang: targetLang }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: 'Request failed' })) as { error: string }
+      throw new Error(body.error)
+    }
+
+    const reader = res.body!.getReader()
+    const decoder = new TextDecoder()
+    let accumulated = ''
+    let done = false
+
+    while (!done) {
+      const { value, done: readerDone } = await reader.read()
+      done = readerDone
+      if (value) {
+        const chunk = decoder.decode(value, { stream: true })
+        for (const line of chunk.split('\n')) {
+          if (!line.startsWith('data: ')) continue
+          const data = line.slice(6).trim()
+          if (data === '[DONE]') { done = true; break }
+          try {
+            const parsed = JSON.parse(data)
+            const content = parsed.choices?.[0]?.delta?.content
+            if (content) accumulated += content
+          } catch {}
+        }
+      }
+    }
+
+    const responseMatch = accumulated.match(/RESPONSE:\s*([\s\S]*?)(?:TRANSLATION:|$)/)
+    const translationMatch = accumulated.match(/TRANSLATION:\s*([\s\S]*)$/)
+    return {
+      response: responseMatch ? responseMatch[1].trim() : accumulated.trim(),
+      translation: translationMatch ? translationMatch[1].trim() : '',
+    }
   }
   async appendParagraph(sessionId: string, original: string, translation: string): Promise<Paragraph> {
     return this.request(`/api/sessions/${sessionId}`, { method: 'PATCH', body: JSON.stringify({ original, translation }) })
