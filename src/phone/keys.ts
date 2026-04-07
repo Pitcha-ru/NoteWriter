@@ -46,8 +46,8 @@ export function initKeys(api: ApiClient, showToast: ShowToast): void {
     const awsSecret  = inputs.awsSecret.value.trim()
     const awsRegion  = inputs.awsRegion.value.trim()
 
-    if (!elevenlabs && !awsAccess && !awsSecret && !awsRegion) {
-      showToast('Enter at least one key to save.', true)
+    if (!elevenlabs || !awsAccess || !awsSecret || !awsRegion) {
+      showToast('All four fields are required.', true)
       return
     }
 
@@ -68,6 +68,8 @@ export function initKeys(api: ApiClient, showToast: ShowToast): void {
       inputs.awsRegion.value  = ''
 
       showToast('Keys saved.')
+      // Notify glasses UI that keys changed
+      window.dispatchEvent(new CustomEvent('notewriter:keys-changed'))
       // Refresh masked placeholders
       await loadMaskedKeys(api)
     } catch (err) {

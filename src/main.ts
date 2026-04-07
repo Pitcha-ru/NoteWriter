@@ -49,6 +49,23 @@ async function init() {
 
   showMenu(bridge)
 
+  // Listen for phone UI changes (both scripts run on same page)
+  window.addEventListener('notewriter:keys-changed', async () => {
+    try {
+      const k = await api.getKeys()
+      appState.setKeysConfigured(k.elevenlabs_key !== null && k.aws_access_key_id !== null)
+      // Refresh menu if we're on it (to update Listen availability)
+      if (appState.currentScreen === 'menu') showMenu(bridge)
+    } catch {}
+  })
+
+  window.addEventListener('notewriter:settings-changed', (e: any) => {
+    const { listenLang, translateLang } = e.detail
+    appState.updateSettings({ listenLang, translateLang })
+    // Refresh settings screen if we're on it
+    if (appState.currentScreen === 'settings') showSettings(bridge)
+  })
+
   // Event handler
   bridge.onEvenHubEvent((event: any) => {
 

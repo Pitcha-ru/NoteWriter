@@ -32,6 +32,13 @@ export function initSettings(api: ApiClient, showToast: ShowToast): void {
 
   void loadSettings()
 
+  // Listen for glasses settings changes
+  window.addEventListener('notewriter:glasses-settings-changed', (e: any) => {
+    const { listenLang, translateLang } = e.detail
+    listenSelect.value = listenLang
+    translateSelect.value = translateLang
+  })
+
   saveBtn.addEventListener('click', async () => {
     const listenLang    = listenSelect.value    as Language
     const translateLang = translateSelect.value as Language
@@ -47,6 +54,8 @@ export function initSettings(api: ApiClient, showToast: ShowToast): void {
     try {
       await api.saveSettings({ listenLang, translateLang })
       showToast('Settings saved.')
+      // Notify glasses UI that settings changed
+      window.dispatchEvent(new CustomEvent('notewriter:settings-changed', { detail: { listenLang, translateLang } }))
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to save settings.', true)
     } finally {

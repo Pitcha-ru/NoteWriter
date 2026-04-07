@@ -32,6 +32,8 @@ export function handleSettingsEvent(
 ): void {
   if (eventType === 3) { // DOUBLE_CLICK_EVENT — save and go back
     api.saveSettings(appState.settings).catch(() => {})
+    // Notify phone UI
+    window.dispatchEvent(new CustomEvent('notewriter:glasses-settings-changed', { detail: appState.settings }))
     onBack()
     return
   }
