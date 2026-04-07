@@ -173,6 +173,7 @@ export async function startListening(bridge: any, api: ApiClient): Promise<void>
       appState.settings.translateLang
     )
     appState.currentSessionId = session.id
+    window.dispatchEvent(new CustomEvent('notewriter:session-created'))
 
     const { token } = await api.getSttToken()
 
@@ -196,7 +197,9 @@ export async function startListening(bridge: any, api: ApiClient): Promise<void>
           updateDisplay()
           // Save immediately to server
           if (appState.currentSessionId) {
-            api.appendParagraph(appState.currentSessionId, text, translated).catch(() => {})
+            api.appendParagraph(appState.currentSessionId, text, translated)
+              .then(() => window.dispatchEvent(new CustomEvent('notewriter:session-updated')))
+              .catch(() => {})
           }
         })
         .catch((err) => {

@@ -66,6 +66,13 @@ async function init() {
     if (appState.currentScreen === 'settings') showSettings(bridge)
   })
 
+  // Sync: if phone deletes a session while glasses are in history, refresh
+  window.addEventListener('notewriter:session-deleted', () => {
+    if (appState.currentScreen === 'history_list') {
+      showHistoryList(bridge, api)
+    }
+  })
+
   // Block click events briefly after screen transitions
   // (simulator sends a ghost click after double-click)
   let lastScreenChange = 0

@@ -61,6 +61,10 @@ export function initHistory(api: ApiClient, showToast: ShowToast): void {
     })
   })
 
+  // Sync: reload list when glasses create/update sessions
+  window.addEventListener('notewriter:session-created', () => void loadSessionList(true))
+  window.addEventListener('notewriter:session-updated', () => void loadSessionList(true))
+
   backBtn.addEventListener('click', () => {
     showList()
   })
@@ -110,6 +114,7 @@ export function initHistory(api: ApiClient, showToast: ShowToast): void {
       api.deleteSession(session.id).then(() => {
         div.remove()
         showToast('Session deleted')
+        window.dispatchEvent(new CustomEvent('notewriter:session-deleted'))
       }).catch((err: unknown) => {
         showToast(err instanceof Error ? err.message : 'Failed to delete session.', true)
       })
