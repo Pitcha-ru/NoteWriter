@@ -4,6 +4,19 @@ import { appState } from '../services/state'
 import { ApiClient } from '../services/api'
 import type { Session, Paragraph } from '../types'
 
+function formatDateShort(dateStr: string | undefined): string {
+  if (!dateStr) return '?'
+  try {
+    // D1 returns "2026-04-07 16:20:00" — add T and Z for proper parsing
+    const iso = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T') + 'Z'
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return dateStr.slice(0, 16)
+    return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
+  } catch {
+    return dateStr.slice(0, 16)
+  }
+}
+
 let sessions: Session[] = []
 let paragraphs: Paragraph[] = []
 let currentParagraphIndex = 0
@@ -20,9 +33,9 @@ export async function showHistoryList(bridge: any, api: ApiClient): Promise<void
       setPageContent(bridge, 'No recordings yet.\nDouble-click to go back.')
     } else {
       const lines = sessions.map((s, i) => {
-        const date = new Date(s.createdAt).toLocaleDateString()
+        const dateStr = formatDateShort(s.createdAt)
         const preview = s.preview ? s.preview.slice(0, 40) : '(empty)'
-        return `${i + 1}. ${date}: ${preview}`
+        return `${i + 1}. ${dateStr}: ${preview}`
       })
       setPageContent(bridge, lines.join('\n'))
     }

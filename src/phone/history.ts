@@ -12,14 +12,18 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#039;')
 }
 
-function formatDate(iso: string): string {
+function formatDate(dateStr: string): string {
   try {
-    return new Date(iso).toLocaleString(undefined, {
+    // D1 returns "2026-04-07 16:20:00" without T/Z — normalize
+    const iso = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T') + 'Z'
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return dateStr
+    return d.toLocaleString(undefined, {
       year: 'numeric', month: 'short', day: 'numeric',
       hour: '2-digit', minute: '2-digit',
     })
   } catch {
-    return iso
+    return dateStr
   }
 }
 

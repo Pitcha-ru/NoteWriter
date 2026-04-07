@@ -21,7 +21,7 @@ export async function getMaskedKeys(deviceId: string, kv: KVNamespace, masterKey
   return {
     elevenlabs_key: mask(keys.elevenlabs_key),
     aws_access_key_id: mask(keys.aws_access_key_id),
-    aws_secret_access_key: null,
+    aws_secret_access_key: mask(keys.aws_secret_access_key),
     aws_region: keys.aws_region,
   }
 }
