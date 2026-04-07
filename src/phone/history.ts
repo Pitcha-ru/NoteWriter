@@ -100,8 +100,20 @@ export function initHistory(api: ApiClient, showToast: ShowToast): void {
         <div class="session-preview">${preview}</div>
         <div class="session-meta">${escapeHtml(formatDate(session.createdAt))}  ·  ${escapeHtml(langName(session.listenLang))} → ${escapeHtml(langName(session.translateLang))}</div>
       </div>
+      <button class="session-delete" aria-label="Delete session">&#128465;</button>
       <span class="session-chevron">›</span>
     `
+
+    const deleteBtn = div.querySelector<HTMLButtonElement>('.session-delete')!
+    deleteBtn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      api.deleteSession(session.id).then(() => {
+        div.remove()
+        showToast('Session deleted')
+      }).catch((err: unknown) => {
+        showToast(err instanceof Error ? err.message : 'Failed to delete session.', true)
+      })
+    })
 
     div.addEventListener('click', () => {
       void openSession(session)
