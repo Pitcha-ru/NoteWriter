@@ -2,6 +2,7 @@ import { Env, SettingsPayload } from './types'
 import { handleRegister, authenticate } from './auth'
 import { saveKeys, getMaskedKeys, deleteKeys } from './keys'
 import { getSettings, updateSettings } from './settings'
+import { createSession, listSessions, getSession, appendParagraph, deleteSession } from './sessions'
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -80,6 +81,45 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
       const body = await request.json<SettingsPayload>()
       const result = await updateSettings(deviceId, body, env.DB)
       if (result.error) return json({ error: result.error }, 400)
+      return json({ ok: true })
+    }
+  }
+
+  // Session routes
+  const sessionMatch = path.match(/^\/api\/sessions\/([^/]+)$/)
+
+  if (path === '/api/sessions') {
+    if (request.method === 'GET') {
+      const cursor = url.searchParams.get('cursor')
+      const limit = parseInt(url.searchParams.get('limit') ?? '20')
+      const result = await listSessions(deviceId, cursor, limit, env.DB)
+      return json(result)
+    }
+    if (request.method === 'POST') {
+      const body = await request.json<{ listen_lang: string; translate_lang: string }>()
+      const session = await createSession(deviceId, body.listen_lang, body.translate_lang, env.DB)
+      return json(session, 201)
+    }
+  }
+
+  if (sessionMatch) {
+    const sessionId = sessionMatch[1]
+    if (request.method === 'GET') {
+      const cursor = url.searchParams.get('cursor')
+      const limit = parseInt(url.searchParams.get('limit') ?? '50')
+      const result = await getSession(sessionId, deviceId, cursor ? parseInt(cursor) : null, limit, env.DB)
+      if (!result) return json({ error: 'Session not found' }, 404)
+      return json(result)
+    }
+    if (request.method === 'PATCH') {
+      const body = await request.json<{ original: string; translation: string }>()
+      const paragraph = await appendParagraph(sessionId, deviceId, body.original, body.translation, env.DB)
+      if (!paragraph) return json({ error: 'Session not found' }, 404)
+      return json(paragraph, 201)
+    }
+    if (request.method === 'DELETE') {
+      const deleted = await deleteSession(sessionId, deviceId, env.DB)
+      if (!deleted) return json({ error: 'Session not found' }, 404)
       return json({ ok: true })
     }
   }
