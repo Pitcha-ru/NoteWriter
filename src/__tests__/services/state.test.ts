@@ -6,7 +6,7 @@ describe('AppState', () => {
   beforeEach(() => { state = new AppState() })
 
   it('starts with default settings', () => {
-    expect(state.settings).toEqual({ listenLang: 'en', translateLang: 'el' })
+    expect(state.settings).toEqual({ listenLang: 'en', translateLang: 'el', context: '', persona: '' })
   })
   it('updates settings', () => {
     state.updateSettings({ listenLang: 'fr' })
