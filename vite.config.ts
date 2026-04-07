@@ -8,4 +8,8 @@ export default defineConfig({
       input: "index.html",
     },
   },
+  test: {
+    include: ["src/__tests__/**/*.test.ts"],
+    environment: "node",
+  },
 });
