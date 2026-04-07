@@ -138,53 +138,39 @@ export function initKeys(api: ApiClient, showToast: ShowToast): void {
     const ar = fields.awsRegion.isEditing ? fields.awsRegion.input.value.trim() : ''
     const oa = fields.openai.isEditing ? fields.openai.input.value.trim() : ''
 
-    // For first save, all four core fields required. OpenAI is optional.
-    const hasExisting = fields.elevenlabs.maskedValue !== ''
-    if (!hasExisting && (!el || !aa || !as_ || !ar)) {
-      showToast('All four fields are required for first setup.', true)
-      return
-    }
-
     const edited = [el, aa, as_, ar, oa].some(v => v !== '')
     if (!edited) {
       showToast('No changes to save.', true)
       return
     }
 
-    // Build payload — only include edited fields, keep existing for others
-    // Worker requires all core fields, so we need to get current values for non-edited fields
-    // Actually, simplify: require all four core fields if any is being provided
-    if (el && aa && as_ && ar) {
-      // Full save
-      saveBtn.disabled = true
-      try {
-        await api.saveKeys({
-          elevenlabsKey: el,
-          awsAccessKeyId: aa,
-          awsSecretAccessKey: as_,
-          awsRegion: ar,
-          openaiKey: oa,
-        })
-        // Store full values for eye-reveal, reset editing state
-        fields.elevenlabs.fullValue = el
-        fields.awsAccess.fullValue = aa
-        fields.awsSecret.fullValue = as_
-        fields.awsRegion.fullValue = ar
-        fields.openai.fullValue = oa
-        for (const field of Object.values(fields)) {
-          field.isEditing = false
-          field.isRevealed = false
-        }
-        showToast('Keys saved.')
-        window.dispatchEvent(new CustomEvent('notewriter:keys-changed'))
-        await loadMasked()
-      } catch (err) {
-        showToast(err instanceof Error ? err.message : 'Failed to save keys.', true)
-      } finally {
-        saveBtn.disabled = false
+    // Send only edited fields — Worker merges with existing
+    saveBtn.disabled = true
+    try {
+      await api.saveKeys({
+        elevenlabsKey: el,
+        awsAccessKeyId: aa,
+        awsSecretAccessKey: as_,
+        awsRegion: ar,
+        openaiKey: oa,
+      })
+      // Store full values for eye-reveal
+      if (el) fields.elevenlabs.fullValue = el
+      if (aa) fields.awsAccess.fullValue = aa
+      if (as_) fields.awsSecret.fullValue = as_
+      if (ar) fields.awsRegion.fullValue = ar
+      if (oa) fields.openai.fullValue = oa
+      for (const field of Object.values(fields)) {
+        field.isEditing = false
+        field.isRevealed = false
       }
-    } else {
-      showToast('Please fill all four fields to update keys.', true)
+      showToast('Keys saved.')
+      window.dispatchEvent(new CustomEvent('notewriter:keys-changed'))
+      await loadMasked()
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to save keys.', true)
+    } finally {
+      saveBtn.disabled = false
     }
   })
 }

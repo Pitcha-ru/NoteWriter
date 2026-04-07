@@ -1,6 +1,6 @@
 import { Env, SettingsPayload, DialogueRequest } from './types'
 import { handleRegister, authenticate } from './auth'
-import { saveKeys, getMaskedKeys, deleteKeys, getCachedKeys } from './keys'
+import { getKeys, saveKeys, getMaskedKeys, deleteKeys, getCachedKeys } from './keys'
 import { mintSttToken } from './stt-token'
 import { translateText } from './translate'
 import { getSettings, updateSettings } from './settings'
@@ -74,11 +74,17 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
       return json(masked ?? { elevenlabs_key: null, aws_access_key_id: null, aws_secret_access_key: null, aws_region: null })
     }
     if (request.method === 'PUT') {
-      const body = await request.json<{ elevenlabs_key: string; aws_access_key_id: string; aws_secret_access_key: string; aws_region: string }>()
-      if (!body.elevenlabs_key || !body.aws_access_key_id || !body.aws_secret_access_key || !body.aws_region) {
-        return json({ error: 'All key fields required' }, 400)
+      const body = await request.json<Record<string, string>>()
+      // Merge with existing keys — only overwrite fields that are non-empty
+      const existing = await getKeys(deviceId, env.KV, env.ENCRYPTION_KEY)
+      const merged = {
+        elevenlabs_key: body.elevenlabs_key || existing?.elevenlabs_key || '',
+        aws_access_key_id: body.aws_access_key_id || existing?.aws_access_key_id || '',
+        aws_secret_access_key: body.aws_secret_access_key || existing?.aws_secret_access_key || '',
+        aws_region: body.aws_region || existing?.aws_region || '',
+        openai_key: body.openai_key || existing?.openai_key || '',
       }
-      await saveKeys(deviceId, body, env.KV, env.ENCRYPTION_KEY)
+      await saveKeys(deviceId, merged, env.KV, env.ENCRYPTION_KEY)
       return json({ ok: true })
     }
     if (request.method === 'DELETE') {
