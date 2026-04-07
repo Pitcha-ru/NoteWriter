@@ -24,7 +24,6 @@ async function init() {
   if (storedToken) {
     appState.setAuthToken(storedToken)
     api.setToken(storedToken)
-    // Sync to both storages
     localStorage.setItem('notewriter_auth_token', storedToken)
     await bridge.setLocalStorage('auth_token', storedToken)
   } else {
@@ -32,13 +31,14 @@ async function init() {
       const { token } = await api.register(deviceId)
       appState.setAuthToken(token)
       api.setToken(token)
-      // Save to both storages so phone UI can use it
       localStorage.setItem('notewriter_auth_token', token)
       await bridge.setLocalStorage('auth_token', token)
     } catch (err) {
       console.error('Registration failed:', err)
     }
   }
+  // Notify phone UI that auth token is ready
+  window.dispatchEvent(new CustomEvent('notewriter:auth-ready'))
 
   // Load settings + check keys
   try { const s = await api.getSettings(); appState.updateSettings(s) } catch {}
@@ -66,15 +66,21 @@ async function init() {
     if (appState.currentScreen === 'settings') showSettings(bridge)
   })
 
+  // Block click events briefly after screen transitions
+  // (simulator sends a ghost click after double-click)
+  let lastScreenChange = 0
+
+  function navigateWithGuard(fn: () => void): void {
+    lastScreenChange = Date.now()
+    fn()
+  }
+
   // Event handler
   bridge.onEvenHubEvent((event: any) => {
 
     if (event.audioEvent?.audioPcm) { handleAudioData(event.audioEvent.audioPcm); return }
 
-    // Parse eventType from various event sources:
-    // - Up/Down come via textEvent.eventType (1/2)
-    // - Double Click comes via sysEvent.eventType (3)
-    // - Click comes via sysEvent with eventSource but NO eventType — treat as CLICK (0)
+    // Parse eventType
     let eventType: number | undefined =
       event.textEvent?.eventType ??
       event.listEvent?.eventType ??
@@ -88,6 +94,9 @@ async function init() {
     const selectedIndex = event.listEvent?.selectedIndex ?? 0
     if (eventType === undefined) return
 
+    // Block CLICK events for 1.5s after screen change (ghost click from double-click)
+    if (eventType === 0 && Date.now() - lastScreenChange < 1500) return
+
     // FOREGROUND_ENTER
     if (eventType === 4) {
       api.getSettings().then(s => appState.updateSettings(s)).catch(() => {})
@@ -97,14 +106,14 @@ async function init() {
 
     switch (appState.currentScreen) {
       case 'menu': handleMenuEvent(bridge, eventType, selectedIndex, {
-        onListen: () => startListening(bridge, api),
-        onHistory: () => showHistoryList(bridge, api),
-        onSettings: () => showSettings(bridge),
+        onListen: () => navigateWithGuard(() => startListening(bridge, api)),
+        onHistory: () => navigateWithGuard(() => showHistoryList(bridge, api)),
+        onSettings: () => navigateWithGuard(() => showSettings(bridge)),
       }); break
-      case 'listen': handleListenEvent(bridge, eventType, api, () => showMenu(bridge)); break
-      case 'history_list': handleHistoryListEvent(bridge, eventType, selectedIndex, api, () => showMenu(bridge)); break
-      case 'history_detail': handleHistoryDetailEvent(bridge, eventType, api, () => showHistoryList(bridge, api)); break
-      case 'settings': handleSettingsEvent(bridge, eventType, selectedIndex, api, () => showMenu(bridge)); break
+      case 'listen': handleListenEvent(bridge, eventType, api, () => navigateWithGuard(() => showMenu(bridge))); break
+      case 'history_list': handleHistoryListEvent(bridge, eventType, selectedIndex, api, () => navigateWithGuard(() => showMenu(bridge))); break
+      case 'history_detail': handleHistoryDetailEvent(bridge, eventType, api, () => navigateWithGuard(() => showHistoryList(bridge, api))); break
+      case 'settings': handleSettingsEvent(bridge, eventType, selectedIndex, api, () => navigateWithGuard(() => showMenu(bridge))); break
     }
   })
 }

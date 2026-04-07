@@ -94,6 +94,36 @@
       .field { margin-bottom: 16px; }
       .field:last-child { margin-bottom: 0; }
 
+      .input-wrap {
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
+
+      .input-wrap input { padding-right: 44px; }
+
+      .eye-btn {
+        position: absolute;
+        right: 10px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 4px;
+        color: #999;
+        font-size: 18px;
+        line-height: 1;
+      }
+
+      .eye-btn:hover { color: #555; }
+
+      .key-status {
+        font-size: 12px;
+        color: #999;
+        margin-top: 4px;
+      }
+
+      .key-status.saved { color: #34c759; }
+
       label {
         display: block;
         font-size: 14px;
@@ -310,19 +340,34 @@
           <div class="card-title">API Keys</div>
           <div class="field">
             <label for="key-elevenlabs">ElevenLabs API Key</label>
-            <input type="password" id="key-elevenlabs" autocomplete="off" />
+            <div class="input-wrap">
+              <input type="password" id="key-elevenlabs" autocomplete="off" />
+              <button class="eye-btn" data-target="key-elevenlabs" type="button" aria-label="Toggle visibility">&#9673;</button>
+            </div>
+            <div class="key-status" id="status-elevenlabs"></div>
           </div>
           <div class="field">
             <label for="key-aws-access">AWS Access Key ID</label>
-            <input type="password" id="key-aws-access" autocomplete="off" />
+            <div class="input-wrap">
+              <input type="password" id="key-aws-access" autocomplete="off" />
+              <button class="eye-btn" data-target="key-aws-access" type="button" aria-label="Toggle visibility">&#9673;</button>
+            </div>
+            <div class="key-status" id="status-aws-access"></div>
           </div>
           <div class="field">
             <label for="key-aws-secret">AWS Secret Access Key</label>
-            <input type="password" id="key-aws-secret" autocomplete="off" />
+            <div class="input-wrap">
+              <input type="password" id="key-aws-secret" autocomplete="off" />
+              <button class="eye-btn" data-target="key-aws-secret" type="button" aria-label="Toggle visibility">&#9673;</button>
+            </div>
+            <div class="key-status" id="status-aws-secret"></div>
           </div>
           <div class="field">
             <label for="key-aws-region">AWS Region</label>
-            <input type="text" id="key-aws-region" placeholder="e.g. us-east-1" autocomplete="off" />
+            <div class="input-wrap">
+              <input type="text" id="key-aws-region" placeholder="e.g. us-east-1" autocomplete="off" />
+            </div>
+            <div class="key-status" id="status-aws-region"></div>
           </div>
         </div>
         <button class="btn btn-primary" id="keys-save-btn">Save Keys</button>

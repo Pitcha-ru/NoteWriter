@@ -3,7 +3,8 @@ import type { Session, Paragraph } from '../types'
 
 type ShowToast = (message: string, isError?: boolean) => void
 
-function escapeHtml(text: string): string {
+function escapeHtml(text: string | undefined | null): string {
+  if (!text) return ''
   return text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -12,7 +13,8 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#039;')
 }
 
-function formatDate(dateStr: string): string {
+function formatDate(dateStr: string | undefined | null): string {
+  if (!dateStr) return '—'
   try {
     // D1 returns "2026-04-07 16:20:00" without T/Z — normalize
     const iso = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T') + 'Z'

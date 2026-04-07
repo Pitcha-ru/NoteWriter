@@ -7,12 +7,6 @@ const WORKER_URL = 'https://notewriter-worker.kiwibudka.workers.dev'
 
 export const api = new ApiClient(WORKER_URL)
 
-// ── Auth token ──────────────────────────────────────────────────────────────
-const stored = localStorage.getItem('notewriter_auth_token')
-if (stored) {
-  api.setToken(stored)
-}
-
 // ── Toast helper (exported so tabs can use it) ──────────────────────────────
 const toastEl = document.getElementById('toast') as HTMLDivElement
 let toastTimer: ReturnType<typeof setTimeout> | null = null
@@ -41,7 +35,41 @@ tabButtons.forEach(btn => {
   })
 })
 
-// ── Initialize all tabs ─────────────────────────────────────────────────────
-initKeys(api, showToast)
-initHistory(api, showToast)
-initSettings(api, showToast)
+// ── Wait for auth token from glasses bridge, then init tabs ─────────────────
+function trySetToken(): boolean {
+  const token = localStorage.getItem('notewriter_auth_token')
+  if (token) {
+    api.setToken(token)
+    return true
+  }
+  return false
+}
+
+function initTabs(): void {
+  initKeys(api, showToast)
+  initHistory(api, showToast)
+  initSettings(api, showToast)
+}
+
+if (trySetToken()) {
+  // Token already in localStorage (page reload or second load)
+  initTabs()
+} else {
+  // Wait for main.ts to register and store token
+  // main.ts dispatches this after saving token to localStorage
+  window.addEventListener('notewriter:auth-ready', () => {
+    trySetToken()
+    initTabs()
+  }, { once: true })
+
+  // Fallback: poll for token (in case event was missed)
+  const poll = setInterval(() => {
+    if (trySetToken()) {
+      clearInterval(poll)
+      initTabs()
+    }
+  }, 500)
+
+  // Stop polling after 10 seconds
+  setTimeout(() => clearInterval(poll), 10000)
+}

@@ -5,54 +5,146 @@ import { SttClient } from '../services/stt'
 import { ApiClient } from '../services/api'
 
 const DISPLAY_ID = 0
-const SILENCE_THRESHOLD_MS = 2000
-
 let sttClient: SttClient | null = null
 let committedPairs: Array<{ original: string; translation: string }> = []
 let partialText = ''
 
-// Pending sentences waiting to be flushed as a paragraph
-let pendingSentences: string[] = []
-let pendingTranslations: string[] = []
-let silenceTimer: ReturnType<typeof setTimeout> | null = null
-
 let currentBridge: any = null
 let currentApi: ApiClient | null = null
+
+// State: 'active' = listening, 'paused' = paused (click to resume, double-click to exit)
+let listenState: 'active' | 'paused' = 'active'
+
+// Indicator
+let indicatorTimer: ReturnType<typeof setInterval> | null = null
+let audioPacketCount = 0
+let indicatorFrame = 0
+let sttStatus = ''
 
 function resetListenState(): void {
   committedPairs = []
   partialText = ''
-  pendingSentences = []
-  pendingTranslations = []
-  if (silenceTimer !== null) {
-    clearTimeout(silenceTimer)
-    silenceTimer = null
+  audioPacketCount = 0
+  sttStatus = ''
+  indicatorFrame = 0
+  listenState = 'active'
+  if (indicatorTimer !== null) { clearInterval(indicatorTimer); indicatorTimer = null }
+}
+
+function buildDisplayText(): string {
+  if (listenState === 'paused') {
+    let text = '|| PAUSED\n\nClick to resume\nDouble-click to exit'
+    if (committedPairs.length > 0) {
+      const last = committedPairs[committedPairs.length - 1]
+      text += `\n\nLast: ${last.original.slice(0, 50)}`
+      if (last.translation && !last.translation.startsWith('[ERR')) {
+        text += `\n${last.translation.slice(0, 50)}`
+      }
+    }
+    return text
   }
+
+  const dots = '.'.repeat((indicatorFrame % 3) + 1).padEnd(3)
+  const status = `Listening ${dots}`
+
+  if (committedPairs.length === 0 && !partialText) {
+    return `${status}\n\nSpeak now...`
+  }
+
+  const content = formatListenDisplay(committedPairs, partialText)
+  return `${status}\n\n${content}`
 }
 
 function updateDisplay(): void {
   if (!currentBridge) return
-  const text = formatListenDisplay(committedPairs, partialText)
-  updateText(currentBridge, DISPLAY_ID, text)
+  updateText(currentBridge, DISPLAY_ID, buildDisplayText())
 }
 
-function scheduleSilenceFlush(): void {
-  if (silenceTimer !== null) clearTimeout(silenceTimer)
-  silenceTimer = setTimeout(() => {
-    silenceTimer = null
-    flushParagraph()
-  }, SILENCE_THRESHOLD_MS)
+function startIndicator(): void {
+  if (indicatorTimer) return
+  indicatorTimer = setInterval(() => {
+    indicatorFrame++
+    updateDisplay()
+  }, 500)
 }
 
-function flushParagraph(): void {
-  if (pendingSentences.length === 0) return
-  const original = pendingSentences.join(' ')
-  const translation = pendingTranslations.join(' ')
-  pendingSentences = []
-  pendingTranslations = []
-  if (appState.currentSessionId && currentApi) {
-    currentApi.appendParagraph(appState.currentSessionId, original, translation).catch(() => {})
+function stopIndicator(): void {
+  if (indicatorTimer !== null) { clearInterval(indicatorTimer); indicatorTimer = null }
+}
+
+function pauseListening(): void {
+  listenState = 'paused'
+  stopIndicator()
+  if (currentBridge) {
+    try { currentBridge.audioControl(false) } catch {}
   }
+  sttClient?.disconnect()
+  updateDisplay()
+}
+
+async function resumeListening(): Promise<void> {
+  if (!currentBridge || !currentApi) return
+  listenState = 'active'
+  partialText = ''
+  sttStatus = ''
+
+  updateText(currentBridge, DISPLAY_ID, 'Resuming...')
+
+  try {
+    const { token } = await currentApi.getSttToken()
+    sttClient = new SttClient(token, { language: appState.settings.listenLang })
+
+    sttClient.onPartialTranscript((text) => {
+      partialText = text
+      updateDisplay()
+    })
+
+    sttClient.onCommittedTranscript((text) => {
+      partialText = ''
+      const sourceLang = appState.settings.listenLang
+      const targetLang = appState.settings.translateLang
+
+      currentApi!.translate(text, sourceLang, targetLang)
+        .then((translated) => {
+          committedPairs.push({ original: text, translation: translated })
+          updateDisplay()
+          // Save immediately to server
+          if (appState.currentSessionId) {
+            currentApi!.appendParagraph(appState.currentSessionId, text, translated).catch(() => {})
+          }
+        })
+        .catch((err) => {
+          const errMsg = err instanceof Error ? err.message : String(err)
+          committedPairs.push({ original: text, translation: `[ERR: ${errMsg.slice(0, 60)}]` })
+          updateDisplay()
+          // Save original even if translation failed
+          if (appState.currentSessionId) {
+            currentApi!.appendParagraph(appState.currentSessionId, text, '').catch(() => {})
+          }
+        })
+    })
+
+    sttClient.onError(() => {})
+    sttClient.onStatus((msg) => { sttStatus = msg })
+
+    sttClient.connect()
+    currentBridge.audioControl(true)
+    startIndicator()
+    updateDisplay()
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    updateText(currentBridge, DISPLAY_ID, `Error resuming: ${msg}\nClick to retry, Double-click to exit`)
+    listenState = 'paused'
+  }
+}
+
+function fullStop(): void {
+  stopIndicator()
+  if (currentBridge) {
+    try { currentBridge.audioControl(false) } catch {}
+  }
+  sttClient?.disconnect()
+  sttClient = null
 }
 
 export async function startListening(bridge: any, api: ApiClient): Promise<void> {
@@ -61,21 +153,17 @@ export async function startListening(bridge: any, api: ApiClient): Promise<void>
   currentApi = api
   resetListenState()
 
-  // Show initial display
-  setPageContent(bridge, 'Starting...')
+  setPageContent(bridge, 'Connecting...')
 
   try {
-    // Create session on server
     const session = await api.createSession(
       appState.settings.listenLang,
       appState.settings.translateLang
     )
     appState.currentSessionId = session.id
 
-    // Get STT token
     const { token } = await api.getSttToken()
 
-    // Start STT client
     sttClient = new SttClient(token, { language: appState.settings.listenLang })
 
     sttClient.onPartialTranscript((text) => {
@@ -91,30 +179,30 @@ export async function startListening(bridge: any, api: ApiClient): Promise<void>
       api.translate(text, sourceLang, targetLang)
         .then((translated) => {
           committedPairs.push({ original: text, translation: translated })
-          pendingSentences.push(text)
-          pendingTranslations.push(translated)
           updateDisplay()
-          scheduleSilenceFlush()
+          // Save immediately to server
+          if (appState.currentSessionId) {
+            api.appendParagraph(appState.currentSessionId, text, translated).catch(() => {})
+          }
         })
-        .catch(() => {
-          committedPairs.push({ original: text, translation: '' })
-          pendingSentences.push(text)
-          pendingTranslations.push('')
+        .catch((err) => {
+          const errMsg = err instanceof Error ? err.message : String(err)
+          committedPairs.push({ original: text, translation: `[ERR: ${errMsg.slice(0, 60)}]` })
           updateDisplay()
-          scheduleSilenceFlush()
+          // Save original even if translation failed
+          if (appState.currentSessionId) {
+            api.appendParagraph(appState.currentSessionId, text, '').catch(() => {})
+          }
         })
     })
 
-    sttClient.onError(() => {
-      // STT errors are non-fatal — reconnect is handled internally
-    })
+    sttClient.onError(() => {})
+    sttClient.onStatus((msg) => { sttStatus = msg; updateDisplay() })
 
     sttClient.connect()
-
-    // Enable audio capture
     bridge.audioControl(true)
-
-    updateText(bridge, DISPLAY_ID, formatListenDisplay([], ''))
+    startIndicator()
+    updateDisplay()
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     updateText(bridge, DISPLAY_ID, `Error: ${msg}\nDouble-click to go back.`)
@@ -127,25 +215,26 @@ export function handleListenEvent(
   api: ApiClient,
   onBack: () => void
 ): void {
-  if (eventType === 3) { // DOUBLE_CLICK
-    stopListening()
-    onBack()
+  if (listenState === 'active') {
+    // Click → pause
+    if (eventType === 0) {
+      pauseListening()
+    }
+  } else if (listenState === 'paused') {
+    // Click → resume
+    if (eventType === 0) {
+      resumeListening()
+    }
+    // Double-click → exit to menu
+    if (eventType === 3) {
+      fullStop()
+      onBack()
+    }
   }
 }
 
-export function handleAudioData(pcmData: ArrayBuffer): void {
+export function handleAudioData(pcmData: any): void {
+  if (listenState !== 'active') return
+  audioPacketCount++
   sttClient?.sendAudio(pcmData)
-}
-
-function stopListening(): void {
-  if (currentBridge) {
-    try { currentBridge.audioControl(false) } catch { /* ignore */ }
-  }
-  flushParagraph()
-  sttClient?.disconnect()
-  sttClient = null
-  if (silenceTimer !== null) {
-    clearTimeout(silenceTimer)
-    silenceTimer = null
-  }
 }

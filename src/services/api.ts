@@ -1,13 +1,13 @@
 import type { Settings, Session, Paragraph, SessionListResponse, SessionDetailResponse, MaskedKeys, ApiKeys } from '../types'
 
-// Convert snake_case keys to camelCase (one level deep)
+// Convert snake_case keys to camelCase (recursive)
 function toCamel(obj: any): any {
   if (Array.isArray(obj)) return obj.map(toCamel)
   if (obj === null || typeof obj !== 'object') return obj
   const out: any = {}
   for (const key of Object.keys(obj)) {
     const camel = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase())
-    out[camel] = obj[key]
+    out[camel] = toCamel(obj[key])
   }
   return out
 }

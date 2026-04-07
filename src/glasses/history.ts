@@ -1,13 +1,14 @@
 // src/glasses/history.ts
-import { setPageContent, formatHistoryDetail } from './renderer'
+import { setPageContent, updateText, formatHistoryDetail } from './renderer'
 import { appState } from '../services/state'
 import { ApiClient } from '../services/api'
 import type { Session, Paragraph } from '../types'
 
+const DISPLAY_ID = 0
+
 function formatDateShort(dateStr: string | undefined): string {
   if (!dateStr) return '?'
   try {
-    // D1 returns "2026-04-07 16:20:00" — add T and Z for proper parsing
     const iso = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T') + 'Z'
     const d = new Date(iso)
     if (isNaN(d.getTime())) return dateStr.slice(0, 16)
@@ -18,30 +19,81 @@ function formatDateShort(dateStr: string | undefined): string {
 }
 
 let sessions: Session[] = []
+let listCursorIndex = 0
 let paragraphs: Paragraph[] = []
 let currentParagraphIndex = 0
+
+// ── History list (with cursor navigation) ────────────────────────────────────
+
+function renderHistoryList(bridge: any): void {
+  if (sessions.length === 0) {
+    setPageContent(bridge, 'No recordings yet.\nDouble-click to go back.')
+    return
+  }
+
+  const lines = sessions.map((s, i) => {
+    const cursor = i === listCursorIndex ? '> ' : '  '
+    const dateStr = formatDateShort(s.createdAt)
+    const preview = s.preview ? s.preview.slice(0, 35) : '(empty)'
+    return `${cursor}${dateStr} ${preview}`
+  })
+  updateText(bridge, DISPLAY_ID, lines.join('\n'))
+}
 
 export async function showHistoryList(bridge: any, api: ApiClient): Promise<void> {
   appState.navigateTo('history_list')
   sessions = []
+  listCursorIndex = 0
+
+  setPageContent(bridge, 'Loading...')
 
   try {
     const response = await api.listSessions()
     sessions = response.sessions
-
-    if (sessions.length === 0) {
-      setPageContent(bridge, 'No recordings yet.\nDouble-click to go back.')
-    } else {
-      const lines = sessions.map((s, i) => {
-        const dateStr = formatDateShort(s.createdAt)
-        const preview = s.preview ? s.preview.slice(0, 40) : '(empty)'
-        return `${i + 1}. ${dateStr}: ${preview}`
-      })
-      setPageContent(bridge, lines.join('\n'))
-    }
+    renderHistoryList(bridge)
   } catch {
-    setPageContent(bridge, 'Failed to load history.\nDouble-click to go back.')
+    updateText(bridge, DISPLAY_ID, 'Failed to load history.\nDouble-click to go back.')
   }
+}
+
+export function handleHistoryListEvent(
+  bridge: any,
+  eventType: number,
+  _selectedIndex: number,
+  api: ApiClient,
+  onBack: () => void
+): void {
+  if (eventType === 3) { // DOUBLE_CLICK — back to menu
+    onBack()
+    return
+  }
+  if (eventType === 1) { // UP — move cursor up
+    if (listCursorIndex > 0) {
+      listCursorIndex--
+      renderHistoryList(bridge)
+    }
+    return
+  }
+  if (eventType === 2) { // DOWN — move cursor down
+    if (listCursorIndex < sessions.length - 1) {
+      listCursorIndex++
+      renderHistoryList(bridge)
+    }
+    return
+  }
+  if (eventType === 0) { // CLICK — open selected session
+    if (sessions.length > 0 && listCursorIndex < sessions.length) {
+      showSessionDetail(bridge, api, listCursorIndex)
+    }
+  }
+}
+
+// ── Session detail (scroll through paragraphs) ──────────────────────────────
+
+function renderParagraph(bridge: any): void {
+  const text = formatHistoryDetail(paragraphs, currentParagraphIndex)
+  const indicator = `${currentParagraphIndex + 1}/${paragraphs.length}`
+  updateText(bridge, DISPLAY_ID, `${indicator}\n\n${text}`)
 }
 
 export async function showSessionDetail(bridge: any, api: ApiClient, sessionIndex: number): Promise<void> {
@@ -51,65 +103,43 @@ export async function showSessionDetail(bridge: any, api: ApiClient, sessionInde
 
   const session = sessions[sessionIndex]
   if (!session) {
-    setPageContent(bridge, 'Session not found.\nDouble-click to go back.')
+    updateText(bridge, DISPLAY_ID, 'Session not found.\nDouble-click to go back.')
     return
   }
+
+  updateText(bridge, DISPLAY_ID, 'Loading...')
 
   try {
     const response = await api.getSession(session.id)
     paragraphs = response.paragraphs
 
     if (paragraphs.length === 0) {
-      setPageContent(bridge, 'No content in this session.\nDouble-click to go back.')
+      updateText(bridge, DISPLAY_ID, 'No content in this session.\nDouble-click to go back.')
     } else {
       renderParagraph(bridge)
     }
   } catch {
-    setPageContent(bridge, 'Failed to load session.\nDouble-click to go back.')
-  }
-}
-
-function renderParagraph(bridge: any): void {
-  const text = formatHistoryDetail(paragraphs, currentParagraphIndex)
-  const indicator = `${currentParagraphIndex + 1}/${paragraphs.length}`
-  setPageContent(bridge, `${indicator}\n\n${text}`)
-}
-
-export function handleHistoryListEvent(
-  bridge: any,
-  eventType: number,
-  selectedIndex: number,
-  api: ApiClient,
-  onBack: () => void
-): void {
-  if (eventType === 3) { // DOUBLE_CLICK — back to menu
-    onBack()
-    return
-  }
-  if (eventType === 0) { // CLICK — open session (selectedIndex from list event, fallback unused here)
-    if (sessions.length > 0 && selectedIndex < sessions.length) {
-      showSessionDetail(bridge, api, selectedIndex)
-    }
+    updateText(bridge, DISPLAY_ID, 'Failed to load session.\nDouble-click to go back.')
   }
 }
 
 export function handleHistoryDetailEvent(
   bridge: any,
   eventType: number,
-  api: ApiClient,
+  _api: ApiClient,
   onBack: () => void
 ): void {
   switch (eventType) {
     case 3: // DOUBLE_CLICK — back to list
       onBack()
       break
-    case 1: // SCROLL_TOP — previous paragraph
+    case 1: // UP — previous paragraph
       if (currentParagraphIndex > 0) {
         currentParagraphIndex--
         renderParagraph(bridge)
       }
       break
-    case 2: // SCROLL_BOTTOM — next paragraph
+    case 2: // DOWN — next paragraph
       if (currentParagraphIndex < paragraphs.length - 1) {
         currentParagraphIndex++
         renderParagraph(bridge)
