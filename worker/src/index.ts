@@ -1,5 +1,6 @@
 import { Env } from './types'
 import { handleRegister, authenticate } from './auth'
+import { saveKeys, getMaskedKeys, deleteKeys } from './keys'
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -46,9 +47,28 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
   if (auth.error) {
     return json({ error: auth.error }, 401)
   }
-  const _deviceId = auth.deviceId!
+  const deviceId = auth.deviceId!
 
-  // Authenticated routes will be added in subsequent tasks
+  // Keys routes
+  if (path === '/api/keys') {
+    if (request.method === 'GET') {
+      const masked = await getMaskedKeys(deviceId, env.KV, env.ENCRYPTION_KEY)
+      return json(masked ?? { elevenlabs_key: null, aws_access_key_id: null, aws_secret_access_key: null, aws_region: null })
+    }
+    if (request.method === 'PUT') {
+      const body = await request.json<{ elevenlabs_key: string; aws_access_key_id: string; aws_secret_access_key: string; aws_region: string }>()
+      if (!body.elevenlabs_key || !body.aws_access_key_id || !body.aws_secret_access_key || !body.aws_region) {
+        return json({ error: 'All key fields required' }, 400)
+      }
+      await saveKeys(deviceId, body, env.KV, env.ENCRYPTION_KEY)
+      return json({ ok: true })
+    }
+    if (request.method === 'DELETE') {
+      await deleteKeys(deviceId, env.KV)
+      return json({ ok: true })
+    }
+  }
+
   return json({ error: 'Not found' }, 404)
 }
 
