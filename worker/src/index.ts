@@ -171,14 +171,14 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
       return json(result)
     }
     if (request.method === 'POST') {
-      const body = await request.json<{ listen_lang: string; translate_lang: string }>()
+      const body = await request.json<{ listen_lang: string; translate_lang: string; mode?: string }>()
       if (!body.listen_lang || !body.translate_lang) {
         return json({ error: 'listen_lang and translate_lang required' }, 400)
       }
       if (!VALID_LANGS.has(body.listen_lang) || !VALID_LANGS.has(body.translate_lang)) {
         return json({ error: 'Invalid language. Allowed: en, el, fr, de, ru' }, 400)
       }
-      const session = await createSession(deviceId, body.listen_lang, body.translate_lang, env.DB)
+      const session = await createSession(deviceId, body.listen_lang, body.translate_lang, env.DB, body.mode ?? 'listen')
       return json(session, 201)
     }
   }

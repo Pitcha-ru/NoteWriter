@@ -15,10 +15,10 @@ export interface Paragraph {
   translation: string
 }
 
-export async function createSession(deviceId: string, listenLang: string, translateLang: string, db: D1Database): Promise<Session> {
+export async function createSession(deviceId: string, listenLang: string, translateLang: string, db: D1Database, mode: string = 'listen'): Promise<Session> {
   const id = crypto.randomUUID()
-  await db.prepare('INSERT INTO sessions (id, device_id, listen_lang, translate_lang) VALUES (?, ?, ?, ?)')
-    .bind(id, deviceId, listenLang, translateLang).run()
+  await db.prepare('INSERT INTO sessions (id, device_id, listen_lang, translate_lang, mode) VALUES (?, ?, ?, ?, ?)')
+    .bind(id, deviceId, listenLang, translateLang, mode).run()
   const session = await db.prepare('SELECT * FROM sessions WHERE id = ?').bind(id).first<Session>()
   return session!
 }
