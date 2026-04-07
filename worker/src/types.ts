@@ -21,11 +21,14 @@ export interface KeysPayload {
   aws_access_key_id: string;
   aws_secret_access_key: string;
   aws_region: string;
+  openai_key: string;
 }
 
 export interface SettingsPayload {
   listen_lang: string;
   translate_lang: string;
+  context: string;
+  persona: string;
 }
 
 export interface MaskedKeys {
@@ -33,4 +36,13 @@ export interface MaskedKeys {
   aws_access_key_id: string | null;
   aws_secret_access_key: string | null;
   aws_region: string | null;
+  openai_key: string | null;
+}
+
+export interface DialogueRequest {
+  messages: Array<{ role: 'other' | 'self'; text: string }>
+  context: string
+  persona: string
+  source_lang: string
+  target_lang: string
 }
