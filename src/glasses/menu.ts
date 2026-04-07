@@ -2,7 +2,7 @@
 import { setPageContent, formatMenuText } from './renderer'
 import { appState } from '../services/state'
 
-const MENU_ITEMS = ['Listen', 'History', 'Settings']
+const MENU_ITEMS = ['Listen', 'Dialogue', 'History', 'Settings']
 
 let selectedIndex = 0
 
@@ -17,6 +17,9 @@ function renderMenu(bridge: any): void {
     if (text === 'Listen' && !appState.keysConfigured) {
       return `${text} (setup keys first)`
     }
+    if (text === 'Dialogue' && (!appState.keysConfigured || !appState.openaiKeyConfigured)) {
+      return `${text} (setup keys first)`
+    }
     return text
   })
   setPageContent(bridge, formatMenuText(items, selectedIndex))
@@ -26,7 +29,7 @@ export function handleMenuEvent(
   bridge: any,
   eventType: number,
   _selectedIndex: number,
-  callbacks: { onListen: () => void; onHistory: () => void; onSettings: () => void }
+  callbacks: { onListen: () => void; onDialogue: () => void; onHistory: () => void; onSettings: () => void }
 ): void {
   // SCROLL_TOP (1) = move cursor up, SCROLL_BOTTOM (2) = move cursor down, CLICK (0) = select
   if (eventType === 1) {
@@ -45,9 +48,12 @@ export function handleMenuEvent(
         if (appState.keysConfigured) callbacks.onListen()
         break
       case 1:
-        callbacks.onHistory()
+        if (appState.keysConfigured && appState.openaiKeyConfigured) callbacks.onDialogue()
         break
       case 2:
+        callbacks.onHistory()
+        break
+      case 3:
         callbacks.onSettings()
         break
     }
