@@ -1,6 +1,7 @@
 import { Env, SettingsPayload } from './types'
 import { handleRegister, authenticate } from './auth'
 import { saveKeys, getMaskedKeys, deleteKeys, getCachedKeys } from './keys'
+import { mintSttToken } from './stt-token'
 import { translateText } from './translate'
 import { getSettings, updateSettings } from './settings'
 import { createSession, listSessions, getSession, appendParagraph, deleteSession } from './sessions'
@@ -84,6 +85,15 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
       if (result.error) return json({ error: result.error }, 400)
       return json({ ok: true })
     }
+  }
+
+  // STT token route
+  if (path === '/api/stt-token' && request.method === 'POST') {
+    const keys = await getCachedKeys(deviceId, env.KV, env.ENCRYPTION_KEY)
+    if (!keys?.elevenlabs_key) return json({ error: 'ElevenLabs key not configured' }, 400)
+    const result = await mintSttToken(keys.elevenlabs_key, env.ELEVENLABS_API_BASE)
+    if ('error' in result) return json({ error: result.error }, 502)
+    return json({ token: result.token })
   }
 
   // Translate route
