@@ -1,15 +1,20 @@
-import { defineConfig } from "vite";
+import { defineConfig } from 'vite'
+import { resolve } from 'path'
 
 export default defineConfig({
+  root: '.',
   build: {
-    outDir: "dist",
-    target: "es2022",
+    outDir: 'dist',
+    emptyOutDir: true,
     rollupOptions: {
-      input: "index.html",
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        phone: resolve(__dirname, 'src/phone/index.html'),
+      },
     },
   },
   test: {
-    include: ["src/__tests__/**/*.test.ts"],
-    environment: "node",
+    include: ['src/**/*.test.ts'],
+    environment: 'node',
   },
-});
+})
