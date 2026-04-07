@@ -372,6 +372,17 @@
           </div>
           <p class="warning-msg" id="settings-same-lang-warn">Listen and translate languages must be different.</p>
         </div>
+        <div class="card">
+          <div class="card-title">Dialogue Settings</div>
+          <div class="field">
+            <label for="settings-context">Context</label>
+            <textarea id="settings-context" rows="3" placeholder="e.g. I'm at a Greek language exam. Answer at A2 level." style="width:100%;padding:11px 12px;border:1.5px solid #e5e5e5;border-radius:10px;font-size:16px;font-family:inherit;background:#fafafa;resize:vertical;outline:none;"></textarea>
+          </div>
+          <div class="field">
+            <label for="settings-persona">Persona</label>
+            <textarea id="settings-persona" rows="3" placeholder="e.g. My name is Alexander, I'm 40, I live in Cyprus." style="width:100%;padding:11px 12px;border:1.5px solid #e5e5e5;border-radius:10px;font-size:16px;font-family:inherit;background:#fafafa;resize:vertical;outline:none;"></textarea>
+          </div>
+        </div>
         <button class="btn btn-primary" id="settings-save-btn">Save Settings</button>
       </section>
 
@@ -430,6 +441,14 @@
               <input type="text" id="key-aws-region" placeholder="e.g. us-east-1" autocomplete="off" />
             </div>
             <div class="key-status" id="status-aws-region"></div>
+          </div>
+          <div class="field">
+            <label for="key-openai">OpenAI API Key</label>
+            <div class="input-wrap">
+              <input type="password" id="key-openai" autocomplete="off" />
+              <button class="eye-btn" data-target="key-openai" type="button" aria-label="Toggle visibility">&#9673;</button>
+            </div>
+            <div class="key-status" id="status-openai"></div>
           </div>
         </div>
         <button class="btn btn-primary" id="keys-save-btn">Save Keys</button>

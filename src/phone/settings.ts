@@ -8,6 +8,8 @@ export function initSettings(api: ApiClient, showToast: ShowToast): void {
   const translateSelect = document.getElementById('settings-translate-lang') as HTMLSelectElement
   const saveBtn         = document.getElementById('settings-save-btn')       as HTMLButtonElement
   const warnEl          = document.getElementById('settings-same-lang-warn') as HTMLParagraphElement
+  const contextArea     = document.getElementById('settings-context')        as HTMLTextAreaElement
+  const personaArea     = document.getElementById('settings-persona')        as HTMLTextAreaElement
 
   // Hide warning whenever user changes a dropdown
   function onSelectChange(): void {
@@ -25,6 +27,8 @@ export function initSettings(api: ApiClient, showToast: ShowToast): void {
       const settings = await api.getSettings()
       listenSelect.value    = settings.listenLang
       translateSelect.value = settings.translateLang
+      contextArea.value = settings.context ?? ''
+      personaArea.value = settings.persona ?? ''
     } catch {
       // silently ignore — dropdowns keep their default (en)
     }
@@ -37,6 +41,8 @@ export function initSettings(api: ApiClient, showToast: ShowToast): void {
     const { listenLang, translateLang } = e.detail
     listenSelect.value = listenLang
     translateSelect.value = translateLang
+    contextArea.value = e.detail.context ?? contextArea.value
+    personaArea.value = e.detail.persona ?? personaArea.value
   })
 
   saveBtn.addEventListener('click', async () => {
@@ -52,7 +58,7 @@ export function initSettings(api: ApiClient, showToast: ShowToast): void {
     saveBtn.disabled = true
 
     try {
-      await api.saveSettings({ listenLang, translateLang })
+      await api.saveSettings({ listenLang, translateLang, context: contextArea.value, persona: personaArea.value })
       showToast('Settings saved.')
       // Notify glasses UI that settings changed
       window.dispatchEvent(new CustomEvent('notewriter:settings-changed', { detail: { listenLang, translateLang } }))

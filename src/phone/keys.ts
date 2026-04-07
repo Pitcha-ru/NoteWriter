@@ -35,6 +35,11 @@ export function initKeys(api: ApiClient, showToast: ShowToast): void {
       statusEl: document.getElementById('status-aws-region') as HTMLElement,
       maskedValue: '', fullValue: '', isEditing: false, isRevealed: false,
     },
+    openai: {
+      input: document.getElementById('key-openai') as HTMLInputElement,
+      statusEl: document.getElementById('status-openai') as HTMLElement,
+      maskedValue: '', fullValue: '', isEditing: false, isRevealed: false,
+    },
   }
 
   function renderField(field: KeyField): void {
@@ -86,6 +91,7 @@ export function initKeys(api: ApiClient, showToast: ShowToast): void {
     'key-aws-access': fields.awsAccess,
     'key-aws-secret': fields.awsSecret,
     'key-aws-region': fields.awsRegion,
+    'key-openai': fields.openai,
   }
 
   document.querySelectorAll<HTMLButtonElement>('.eye-btn').forEach(btn => {
@@ -115,6 +121,7 @@ export function initKeys(api: ApiClient, showToast: ShowToast): void {
       showMasked(fields.awsAccess, masked.awsAccessKeyId)
       showMasked(fields.awsSecret, masked.awsSecretAccessKey)
       showMasked(fields.awsRegion, masked.awsRegion)
+      showMasked(fields.openai, masked.openaiKey)
     } catch {
       // Not configured yet
     }
@@ -129,23 +136,24 @@ export function initKeys(api: ApiClient, showToast: ShowToast): void {
     const aa = fields.awsAccess.isEditing ? fields.awsAccess.input.value.trim() : ''
     const as_ = fields.awsSecret.isEditing ? fields.awsSecret.input.value.trim() : ''
     const ar = fields.awsRegion.isEditing ? fields.awsRegion.input.value.trim() : ''
+    const oa = fields.openai.isEditing ? fields.openai.input.value.trim() : ''
 
-    // For first save, all fields required. For update, at least one must be edited.
+    // For first save, all four core fields required. OpenAI is optional.
     const hasExisting = fields.elevenlabs.maskedValue !== ''
     if (!hasExisting && (!el || !aa || !as_ || !ar)) {
       showToast('All four fields are required for first setup.', true)
       return
     }
 
-    const edited = [el, aa, as_, ar].some(v => v !== '')
+    const edited = [el, aa, as_, ar, oa].some(v => v !== '')
     if (!edited) {
       showToast('No changes to save.', true)
       return
     }
 
     // Build payload — only include edited fields, keep existing for others
-    // Worker requires all fields, so we need to get current values for non-edited fields
-    // Actually, simplify: require all fields if any key field is missing
+    // Worker requires all core fields, so we need to get current values for non-edited fields
+    // Actually, simplify: require all four core fields if any is being provided
     if (el && aa && as_ && ar) {
       // Full save
       saveBtn.disabled = true
@@ -155,12 +163,14 @@ export function initKeys(api: ApiClient, showToast: ShowToast): void {
           awsAccessKeyId: aa,
           awsSecretAccessKey: as_,
           awsRegion: ar,
+          openaiKey: oa,
         })
         // Store full values for eye-reveal, reset editing state
         fields.elevenlabs.fullValue = el
         fields.awsAccess.fullValue = aa
         fields.awsSecret.fullValue = as_
         fields.awsRegion.fullValue = ar
+        fields.openai.fullValue = oa
         for (const field of Object.values(fields)) {
           field.isEditing = false
           field.isRevealed = false
