@@ -24,7 +24,7 @@ function createMockD1() {
                 })
               }
               if (query.includes('UPDATE')) {
-                const deviceId = args[2] as string
+                const deviceId = args[4] as string
                 settings.set(deviceId, {
                   device_id: deviceId,
                   listen_lang: args[0] as string,
@@ -51,6 +51,7 @@ describe('settings', () => {
   it('returns settings for device', async () => {
     const settings = await getSettings('device-1', db)
     expect(settings).toEqual({ listen_lang: 'en', translate_lang: 'el' })
+    // context and persona may be present (from DB defaults) or absent in mock
   })
 
   it('returns null for unknown device', async () => {
@@ -59,7 +60,7 @@ describe('settings', () => {
   })
 
   it('updates settings', async () => {
-    const result = await updateSettings('device-1', { listen_lang: 'fr', translate_lang: 'de' }, db)
+    const result = await updateSettings('device-1', { listen_lang: 'fr', translate_lang: 'de', context: '', persona: '' }, db)
     expect(result.error).toBeUndefined()
     const settings = await getSettings('device-1', db)
     expect(settings!.listen_lang).toBe('fr')
@@ -67,12 +68,12 @@ describe('settings', () => {
   })
 
   it('rejects invalid language', async () => {
-    const result = await updateSettings('device-1', { listen_lang: 'xx', translate_lang: 'de' }, db)
+    const result = await updateSettings('device-1', { listen_lang: 'xx', translate_lang: 'de', context: '', persona: '' }, db)
     expect(result.error).toContain('Invalid language')
   })
 
   it('rejects same source and target', async () => {
-    const result = await updateSettings('device-1', { listen_lang: 'en', translate_lang: 'en' }, db)
+    const result = await updateSettings('device-1', { listen_lang: 'en', translate_lang: 'en', context: '', persona: '' }, db)
     expect(result.error).toContain('must differ')
   })
 })

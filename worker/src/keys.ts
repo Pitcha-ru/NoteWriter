@@ -31,7 +31,8 @@ export async function deleteKeys(deviceId: string, kv: KVNamespace): Promise<voi
   await kv.delete(`${KV_PREFIX}${deviceId}`)
 }
 
-function mask(value: string): string {
+function mask(value: string | undefined | null): string | null {
+  if (!value) return null
   if (value.length <= 3) return '****'
   return '****' + value.slice(-3)
 }

@@ -1,10 +1,11 @@
-import { Env, SettingsPayload } from './types'
+import { Env, SettingsPayload, DialogueRequest } from './types'
 import { handleRegister, authenticate } from './auth'
 import { saveKeys, getMaskedKeys, deleteKeys, getCachedKeys } from './keys'
 import { mintSttToken } from './stt-token'
 import { translateText } from './translate'
 import { getSettings, updateSettings } from './settings'
 import { createSession, listSessions, getSession, appendParagraph, deleteSession } from './sessions'
+import { buildOpenAIMessages, streamDialogueResponse } from './dialogue'
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -134,6 +135,28 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
       return json({ translated_text: translated })
     } catch (err) {
       return json({ error: err instanceof Error ? err.message : 'Translation failed' }, 502)
+    }
+  }
+
+  // Dialogue route
+  if (path === '/api/dialogue/generate' && request.method === 'POST') {
+    const body = await request.json<DialogueRequest>()
+    if (!body.messages?.length) return json({ error: 'messages required' }, 400)
+    const keys = await getCachedKeys(deviceId, env.KV, env.ENCRYPTION_KEY)
+    if (!keys?.openai_key) return json({ error: 'OpenAI key not configured' }, 400)
+    const targetLangName = { en: 'English', el: 'Greek', fr: 'French', de: 'German', ru: 'Russian' }[body.target_lang] ?? body.target_lang
+    const openaiMessages = buildOpenAIMessages(body.messages, body.context, body.persona, targetLangName)
+    try {
+      const streamResponse = await streamDialogueResponse(openaiMessages, keys.openai_key)
+      if (!streamResponse.ok) {
+        const err = await streamResponse.text()
+        return json({ error: `OpenAI error (${streamResponse.status}): ${err.slice(0, 200)}` }, 502)
+      }
+      return new Response(streamResponse.body, {
+        headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' },
+      })
+    } catch (err) {
+      return json({ error: err instanceof Error ? err.message : 'Generation failed' }, 502)
     }
   }
 
