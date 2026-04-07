@@ -90,9 +90,9 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
   if (path === '/api/settings') {
     if (request.method === 'GET') {
       const settings = await getSettings(deviceId, env.DB)
-      const s = settings ?? { listen_lang: 'en', translate_lang: 'el' }
+      const s = settings ?? { listen_lang: 'en', translate_lang: 'el', context: '', persona: '' }
       // Return both formats for compatibility
-      return json({ listen_lang: s.listen_lang, translate_lang: s.translate_lang, listenLang: s.listen_lang, translateLang: s.translate_lang })
+      return json({ listen_lang: s.listen_lang, translate_lang: s.translate_lang, context: s.context, persona: s.persona, listenLang: s.listen_lang, translateLang: s.translate_lang })
     }
     if (request.method === 'PUT') {
       const raw = await request.json<any>()
@@ -100,6 +100,8 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
       const body: SettingsPayload = {
         listen_lang: raw.listen_lang ?? raw.listenLang,
         translate_lang: raw.translate_lang ?? raw.translateLang,
+        context: raw.context ?? '',
+        persona: raw.persona ?? '',
       }
       const result = await updateSettings(deviceId, body, env.DB)
       if (result.error) return json({ error: result.error }, 400)
