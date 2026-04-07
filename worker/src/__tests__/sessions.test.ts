@@ -4,69 +4,81 @@ import type { Session, Paragraph } from '../sessions'
 
 function createMockD1() {
   const sessions: Map<string, Session> = new Map()
-  const paragraphs: Map<string, Paragraph[]> = new Map() // keyed by session_id
+  const paragraphs: Map<string, Paragraph> = new Map() // keyed by paragraph id
+
+  function getSessionParagraphs(sessionId: string): Paragraph[] {
+    return Array.from(paragraphs.values()).filter(p => p.session_id === sessionId)
+  }
 
   return {
     prepare(query: string) {
+      // Normalise for pattern matching
+      const q = query.trim().replace(/\s+/g, ' ').toUpperCase()
+
       return {
         bind(...args: unknown[]) {
           return {
             async first<T = unknown>(): Promise<T | null> {
-              const q = query.trim().toUpperCase()
-
-              if (q.startsWith('INSERT INTO SESSIONS')) {
-                // handled in run()
-                return null
-              }
+              // SELECT * FROM sessions WHERE id = ? AND device_id = ?
               if (q.startsWith('SELECT * FROM SESSIONS WHERE ID = ? AND DEVICE_ID = ?')) {
                 const [id, deviceId] = args as string[]
                 const s = sessions.get(id)
                 return (s && s.device_id === deviceId ? s : null) as T | null
               }
-              if (q.startsWith('SELECT * FROM SESSIONS WHERE ID = ?')) {
-                return (sessions.get(args[0] as string) ?? null) as T | null
-              }
+              // SELECT id FROM sessions WHERE id = ? AND device_id = ?
               if (q.startsWith('SELECT ID FROM SESSIONS WHERE ID = ? AND DEVICE_ID = ?')) {
                 const [id, deviceId] = args as string[]
                 const s = sessions.get(id)
                 return (s && s.device_id === deviceId ? { id: s.id } : null) as T | null
               }
-              if (q.startsWith('SELECT MAX(POSITION)')) {
-                const sessionId = args[0] as string
-                const ps = paragraphs.get(sessionId) ?? []
-                const max_pos = ps.length > 0 ? Math.max(...ps.map(p => p.position)) : null
-                return { max_pos } as T
+              // SELECT * FROM sessions WHERE id = ?
+              if (q.startsWith('SELECT * FROM SESSIONS WHERE ID = ?')) {
+                return (sessions.get(args[0] as string) ?? null) as T | null
+              }
+              // SELECT position FROM paragraphs WHERE id = ?  (after INSERT ... SELECT)
+              if (q.startsWith('SELECT POSITION FROM PARAGRAPHS WHERE ID = ?')) {
+                const p = paragraphs.get(args[0] as string)
+                return (p ? { position: p.position } : null) as T | null
               }
               return null
             },
 
             async all<T = unknown>(): Promise<{ results: T[] }> {
-              const q = query.trim().toUpperCase()
-
+              // SELECT * FROM sessions WHERE device_id = ? [AND cursor] ORDER BY … LIMIT ?
               if (q.startsWith('SELECT * FROM SESSIONS WHERE DEVICE_ID = ?')) {
-                const [deviceId, ...rest] = args as unknown[]
+                const deviceId = args[0] as string
                 let filtered = Array.from(sessions.values()).filter(s => s.device_id === deviceId)
-                // cursor: AND created_at < ?
-                if (query.includes('created_at < ?')) {
-                  const cursor = rest[0] as string
-                  filtered = filtered.filter(s => s.created_at < cursor)
+
+                // cursor: AND (created_at < ? OR (created_at = ? AND id < ?))
+                if (q.includes('CREATED_AT < ?')) {
+                  const cursorCreatedAt = args[1] as string
+                  const cursorId = args[3] as string
+                  filtered = filtered.filter(s =>
+                    s.created_at < cursorCreatedAt ||
+                    (s.created_at === cursorCreatedAt && s.id < cursorId)
+                  )
                 }
-                // ORDER BY created_at DESC
-                filtered.sort((a, b) => b.created_at.localeCompare(a.created_at))
-                const limit = rest[rest.length - 1] as number
+
+                // ORDER BY created_at DESC, id DESC
+                filtered.sort((a, b) => {
+                  const cmp = b.created_at.localeCompare(a.created_at)
+                  return cmp !== 0 ? cmp : b.id.localeCompare(a.id)
+                })
+
+                const limit = args[args.length - 1] as number
                 return { results: filtered.slice(0, limit) as unknown as T[] }
               }
 
+              // SELECT * FROM paragraphs WHERE session_id = ? [AND position > ?] ORDER BY position ASC LIMIT ?
               if (q.startsWith('SELECT * FROM PARAGRAPHS WHERE SESSION_ID = ?')) {
-                const [sessionId, ...rest] = args as unknown[]
-                let ps = (paragraphs.get(sessionId as string) ?? []).slice()
-                // cursor: AND position > ?
-                if (query.includes('position > ?')) {
-                  const cursor = rest[0] as number
+                const sessionId = args[0] as string
+                let ps = getSessionParagraphs(sessionId)
+                if (q.includes('POSITION > ?')) {
+                  const cursor = args[1] as number
                   ps = ps.filter(p => p.position > cursor)
                 }
                 ps.sort((a, b) => a.position - b.position)
-                const limit = rest[rest.length - 1] as number
+                const limit = args[args.length - 1] as number
                 return { results: ps.slice(0, limit) as unknown as T[] }
               }
 
@@ -74,8 +86,7 @@ function createMockD1() {
             },
 
             async run(): Promise<{ meta: { changes: number } }> {
-              const q = query.trim().toUpperCase()
-
+              // INSERT INTO sessions …
               if (q.startsWith('INSERT INTO SESSIONS')) {
                 const [id, device_id, listen_lang, translate_lang] = args as string[]
                 const session: Session = {
@@ -90,15 +101,19 @@ function createMockD1() {
                 return { meta: { changes: 1 } }
               }
 
-              if (q.startsWith('INSERT INTO PARAGRAPHS')) {
-                const [id, session_id, position, original, translation] = args as [string, string, number, string, string]
+              // INSERT INTO paragraphs … SELECT … COALESCE(MAX(position), -1) + 1 … FROM paragraphs WHERE session_id = ?
+              // args: id, session_id, original, translation, session_id
+              if (q.startsWith('INSERT INTO PARAGRAPHS') && q.includes('COALESCE')) {
+                const [id, session_id, original, translation] = args as string[]
+                const ps = getSessionParagraphs(session_id)
+                const maxPos = ps.length > 0 ? Math.max(...ps.map(p => p.position)) : -1
+                const position = maxPos + 1
                 const para: Paragraph = { id, session_id, position, original, translation }
-                const list = paragraphs.get(session_id) ?? []
-                list.push(para)
-                paragraphs.set(session_id, list)
+                paragraphs.set(id, para)
                 return { meta: { changes: 1 } }
               }
 
+              // UPDATE sessions SET preview = ? WHERE id = ?
               if (q.startsWith('UPDATE SESSIONS SET PREVIEW')) {
                 const [preview, id] = args as string[]
                 const s = sessions.get(id)
@@ -106,6 +121,7 @@ function createMockD1() {
                 return { meta: { changes: 1 } }
               }
 
+              // DELETE FROM sessions WHERE id = ? AND device_id = ?
               if (q.startsWith('DELETE FROM SESSIONS WHERE ID = ? AND DEVICE_ID = ?')) {
                 const [id, deviceId] = args as string[]
                 const s = sessions.get(id)
@@ -167,7 +183,7 @@ describe('sessions (behavioral)', () => {
       expect(result.cursor).toBeNull()
     })
 
-    it('paginates with cursor when there are more results than limit', async () => {
+    it('paginates and returns a cursor when there are more results than limit', async () => {
       for (let i = 0; i < 3; i++) {
         await createSession('device-page', 'en', 'fr', db)
       }
@@ -191,12 +207,11 @@ describe('sessions (behavioral)', () => {
     it('sets preview on first paragraph', async () => {
       const session = await createSession('device-1', 'en', 'fr', db)
       await appendParagraph(session.id, 'device-1', 'First paragraph text', 'Translated', db)
-      // Re-fetch to confirm preview was set via listSessions
       const { sessions } = await listSessions('device-1', null, 10, db)
       expect(sessions[0].preview).toBe('First paragraph text')
     })
 
-    it('does not change preview after first paragraph', async () => {
+    it('does not update preview after first paragraph', async () => {
       const session = await createSession('device-1', 'en', 'fr', db)
       await appendParagraph(session.id, 'device-1', 'First', 'Premier', db)
       await appendParagraph(session.id, 'device-1', 'Second', 'Deuxieme', db)
@@ -210,7 +225,7 @@ describe('sessions (behavioral)', () => {
       expect(result).toBeNull()
     })
 
-    it('truncates preview to 100 chars if original is longer', async () => {
+    it('truncates preview to 100 chars when original is longer', async () => {
       const session = await createSession('device-1', 'en', 'fr', db)
       const longText = 'A'.repeat(150)
       await appendParagraph(session.id, 'device-1', longText, 'Trans', db)
