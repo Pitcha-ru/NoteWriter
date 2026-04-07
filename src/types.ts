@@ -1,9 +1,16 @@
 // Supported languages for STT + translation (Greek supported at service level)
 export type Language = "en" | "el" | "fr" | "de" | "ru";
 
+export interface DialogueMessage {
+  role: 'other' | 'self';
+  text: string;
+}
+
 export interface Settings {
   listenLang: Language;
   translateLang: Language;
+  context: string;
+  persona: string;
 }
 
 export interface Session {
@@ -13,6 +20,7 @@ export interface Session {
   listenLang: Language;
   translateLang: Language;
   preview: string | null;
+  mode?: string;
 }
 
 export interface Paragraph {
@@ -39,6 +47,7 @@ export interface MaskedKeys {
   awsAccessKeyId: string | null;
   awsSecretAccessKey: string | null;
   awsRegion: string | null;
+  openaiKey: string | null;
 }
 
 export interface ApiKeys {
@@ -46,4 +55,5 @@ export interface ApiKeys {
   awsAccessKeyId: string;
   awsSecretAccessKey: string;
   awsRegion: string;
+  openaiKey: string;
 }

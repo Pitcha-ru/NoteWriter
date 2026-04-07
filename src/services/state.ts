@@ -1,11 +1,12 @@
 import type { Settings, Language } from '../types'
 
-export type Screen = 'menu' | 'listen' | 'history_list' | 'history_detail' | 'settings'
+export type Screen = 'menu' | 'listen' | 'history_list' | 'history_detail' | 'settings' | 'dialogue'
 
 export class AppState {
-  settings: Settings = { listenLang: 'en', translateLang: 'el' }
+  settings: Settings = { listenLang: 'en', translateLang: 'el', context: '', persona: '' }
   currentScreen: Screen = 'menu'
   keysConfigured = false
+  openaiKeyConfigured = false
   authToken: string | null = null
   deviceId: string | null = null
   currentSessionId: string | null = null
