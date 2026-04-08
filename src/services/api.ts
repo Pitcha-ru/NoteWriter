@@ -96,16 +96,21 @@ export class ApiClient {
     const reader = res.body!.getReader()
     const decoder = new TextDecoder()
     let accumulated = ''
+    let buffer = '' // buffer for incomplete lines across chunks
     let done = false
 
     while (!done) {
       const { value, done: readerDone } = await reader.read()
       done = readerDone
       if (value) {
-        const chunk = decoder.decode(value, { stream: true })
-        for (const line of chunk.split('\n')) {
-          if (!line.startsWith('data: ')) continue
-          const data = line.slice(6).trim()
+        buffer += decoder.decode(value, { stream: true })
+        // Process complete lines only (ending with \n)
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? '' // keep last incomplete line in buffer
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed.startsWith('data:')) continue
+          const data = trimmed.slice(5).trim()
           if (data === '[DONE]') { done = true; break }
           try {
             const parsed = JSON.parse(data)
@@ -113,6 +118,17 @@ export class ApiClient {
             if (content) accumulated += content
           } catch {}
         }
+      }
+    }
+    // Process any remaining buffer
+    if (buffer.trim().startsWith('data:')) {
+      const data = buffer.trim().slice(5).trim()
+      if (data && data !== '[DONE]') {
+        try {
+          const parsed = JSON.parse(data)
+          const content = parsed.choices?.[0]?.delta?.content
+          if (content) accumulated += content
+        } catch {}
       }
     }
 
