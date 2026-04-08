@@ -49,6 +49,33 @@ function initTabs(): void {
   initKeys(api, showToast)
   initHistory(api, showToast)
   initSettings(api, showToast)
+  initStartStop()
+}
+
+// ── Start/Stop button — controls glasses display ───────────────────────────
+function initStartStop(): void {
+  const btn = document.getElementById('glasses-start-btn') as HTMLButtonElement
+  let running = false
+
+  btn.addEventListener('click', () => {
+    running = !running
+    if (running) {
+      btn.textContent = 'Stop'
+      btn.style.background = '#d44'
+      window.dispatchEvent(new CustomEvent('notewriter:glasses-start'))
+    } else {
+      btn.textContent = 'Start'
+      btn.style.background = '#34c759'
+      window.dispatchEvent(new CustomEvent('notewriter:glasses-stop'))
+    }
+  })
+
+  // Sync if glasses stop themselves (e.g. double-click exit)
+  window.addEventListener('notewriter:glasses-stopped', () => {
+    running = false
+    btn.textContent = 'Start'
+    btn.style.background = '#34c759'
+  })
 }
 
 if (trySetToken()) {

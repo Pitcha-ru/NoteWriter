@@ -76,6 +76,16 @@ async function init() {
     }
   })
 
+  // Phone Start/Stop button
+  window.addEventListener('notewriter:glasses-start', () => {
+    showMenu(bridge)
+  })
+
+  window.addEventListener('notewriter:glasses-stop', () => {
+    // Shut down any active mode and close glasses display
+    try { bridge.shutDownPageContainer(0) } catch {}
+  })
+
   // Block click events briefly after screen transitions
   // (simulator sends a ghost click after double-click)
   let lastScreenChange = 0
