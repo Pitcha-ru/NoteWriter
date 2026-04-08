@@ -175,6 +175,13 @@ function fullStop(): void {
   }
   sttClient?.disconnect()
   sttClient = null
+  listenState = 'active'
+}
+
+/** Reset all listen module state — call when returning to menu */
+export function resetListen(): void {
+  fullStop()
+  resetListenState()
 }
 
 export async function startListening(bridge: any, api: ApiClient): Promise<void> {

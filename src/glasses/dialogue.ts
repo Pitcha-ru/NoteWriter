@@ -100,6 +100,13 @@ function stopAudio(): void {
   sttClient = null
 }
 
+/** Reset all dialogue module state — call when returning to menu */
+export function resetDialogue(): void {
+  stopIndicator()
+  stopAudio()
+  resetState()
+}
+
 async function startAudio(api: ApiClient): Promise<void> {
   const { token } = await api.getSttToken()
   sttClient = new SttClient(token, { language: appState.settings.listenLang })

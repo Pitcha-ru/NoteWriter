@@ -2,8 +2,8 @@ import { waitForEvenAppBridge } from '@evenrealities/even_hub_sdk'
 import { appState } from './services/state'
 import { ApiClient } from './services/api'
 import { showMenu, handleMenuEvent } from './glasses/menu'
-import { startListening, handleListenEvent, handleAudioData } from './glasses/listen'
-import { startDialogue, handleDialogueEvent, handleDialogueAudio } from './glasses/dialogue'
+import { startListening, handleListenEvent, handleAudioData, resetListen } from './glasses/listen'
+import { startDialogue, handleDialogueEvent, handleDialogueAudio, resetDialogue } from './glasses/dialogue'
 import { showHistoryList, handleHistoryListEvent, handleHistoryDetailEvent } from './glasses/history'
 import { showSettings, handleSettingsEvent } from './glasses/settings'
 import { resetPage } from './glasses/renderer'
@@ -76,13 +76,22 @@ async function init() {
     }
   })
 
+  // Clean reset of all module state
+  function resetAll(): void {
+    resetListen()
+    resetDialogue()
+    appState.navigateTo('menu')
+  }
+
   // Phone Start/Stop button
   window.addEventListener('notewriter:glasses-start', () => {
+    resetAll()
     resetPage()
     showMenu(bridge)
   })
 
   window.addEventListener('notewriter:glasses-stop', () => {
+    resetAll()
     try { bridge.shutDownPageContainer(0) } catch {}
     resetPage()
   })
@@ -135,13 +144,14 @@ async function init() {
         onHistory: () => navigateWithGuard(() => showHistoryList(bridge, api)),
         onSettings: () => navigateWithGuard(() => showSettings(bridge)),
         onExit: () => {
+          resetAll()
           try { bridge.shutDownPageContainer(0) } catch {}
           resetPage()
           window.dispatchEvent(new CustomEvent('notewriter:glasses-stopped'))
         },
       }); break
-      case 'listen': handleListenEvent(bridge, eventType, api, () => navigateWithGuard(() => showMenu(bridge))); break
-      case 'dialogue': handleDialogueEvent(bridge, eventType, api, () => navigateWithGuard(() => showMenu(bridge))); break
+      case 'listen': handleListenEvent(bridge, eventType, api, () => navigateWithGuard(() => { resetAll(); showMenu(bridge) })); break
+      case 'dialogue': handleDialogueEvent(bridge, eventType, api, () => navigateWithGuard(() => { resetAll(); showMenu(bridge) })); break
       case 'history_list': handleHistoryListEvent(bridge, eventType, selectedIndex, api, () => navigateWithGuard(() => showMenu(bridge))); break
       case 'history_detail': handleHistoryDetailEvent(bridge, eventType, api, () => navigateWithGuard(() => showHistoryList(bridge, api))); break
       case 'settings': handleSettingsEvent(bridge, eventType, selectedIndex, api, () => navigateWithGuard(() => showMenu(bridge))); break
