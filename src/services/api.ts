@@ -116,12 +116,18 @@ export class ApiClient {
       }
     }
 
-    const responseMatch = accumulated.match(/RESPONSE:\s*([\s\S]*?)(?:TRANSLATION:|$)/)
-    const translationMatch = accumulated.match(/TRANSLATION:\s*([\s\S]*)$/)
-    return {
-      response: responseMatch ? responseMatch[1].trim() : accumulated.trim(),
-      translation: translationMatch ? translationMatch[1].trim() : '',
-    }
+    // Parse RESPONSE/TRANSLATION markers (flexible: with or without colon)
+    const responseMatch = accumulated.match(/RESPONSE:?\s*([\s\S]*?)(?=\nTRANSLATION|$)/i)
+    const translationMatch = accumulated.match(/TRANSLATION:?\s*([\s\S]*)$/i)
+
+    let response = responseMatch ? responseMatch[1].trim() : accumulated.trim()
+    let translation = translationMatch ? translationMatch[1].trim() : ''
+
+    // Strip any remaining markers
+    response = response.replace(/^RESPONSE:?\s*/i, '').replace(/\nTRANSLATION:?\s*[\s\S]*$/i, '').trim()
+    translation = translation.replace(/^TRANSLATION:?\s*/i, '').trim()
+
+    return { response, translation }
   }
   async appendParagraph(sessionId: string, original: string, translation: string): Promise<Paragraph> {
     return this.request(`/api/sessions/${sessionId}`, { method: 'PATCH', body: JSON.stringify({ original, translation }) })
