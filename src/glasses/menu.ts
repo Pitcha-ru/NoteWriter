@@ -5,10 +5,12 @@ import { appState } from '../services/state'
 const MENU_ITEMS = ['Listen', 'Dialogue', 'History', 'Settings']
 
 let selectedIndex = 0
+let menuShownAt = 0
 
 export function showMenu(bridge: any): void {
   appState.navigateTo('menu')
   selectedIndex = 0
+  menuShownAt = Date.now()
   renderMenu(bridge)
 }
 
@@ -47,6 +49,8 @@ export function handleMenuEvent(
     return
   }
   if (eventType === 0) {
+    // Block clicks for 2s after menu was shown (ghost click from double-click)
+    if (Date.now() - menuShownAt < 2000) return
     switch (selectedIndex) {
       case 0:
         if (appState.keysConfigured) callbacks.onListen()
