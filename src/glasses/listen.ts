@@ -5,6 +5,8 @@ import { SttClient } from '../services/stt'
 import { ApiClient } from '../services/api'
 
 const DISPLAY_ID = 0
+// 'listen' = specified language, 'auto' = auto-detect language
+let listenMode: 'listen' | 'auto' = 'listen'
 let sttClient: SttClient | null = null
 let committedPairs: Array<{ original: string; translation: string }> = []
 let partialText = ''
@@ -104,7 +106,8 @@ async function resumeListening(): Promise<void> {
 
   try {
     const { token } = await currentApi.getSttToken()
-    sttClient = new SttClient(token, { language: appState.settings.listenLang })
+    const sttLang = listenMode === 'auto' ? '' : appState.settings.listenLang
+    sttClient = new SttClient(token, { language: sttLang })
 
     sttClient.onPartialTranscript((text) => {
       partialText = text
@@ -113,7 +116,7 @@ async function resumeListening(): Promise<void> {
 
     sttClient.onCommittedTranscript((text) => {
       partialText = ''
-      const sourceLang = appState.settings.listenLang
+      const sourceLang = listenMode === 'auto' ? 'auto' : appState.settings.listenLang
       const targetLang = appState.settings.translateLang
 
       currentApi!.translate(text, sourceLang, targetLang)
@@ -159,8 +162,9 @@ function fullStop(): void {
   sttClient = null
 }
 
-export async function startListening(bridge: any, api: ApiClient): Promise<void> {
-  appState.navigateTo('listen')
+export async function startListening(bridge: any, api: ApiClient, mode: 'listen' | 'auto' = 'listen'): Promise<void> {
+  listenMode = mode
+  appState.navigateTo(mode === 'auto' ? 'auto' : 'listen')
   currentBridge = bridge
   currentApi = api
   resetListenState()
@@ -169,15 +173,17 @@ export async function startListening(bridge: any, api: ApiClient): Promise<void>
 
   try {
     const session = await api.createSession(
-      appState.settings.listenLang,
-      appState.settings.translateLang
+      mode === 'auto' ? 'auto' : appState.settings.listenLang,
+      appState.settings.translateLang,
+      mode === 'auto' ? 'auto' : 'listen'
     )
     appState.currentSessionId = session.id
     window.dispatchEvent(new CustomEvent('notewriter:session-created'))
 
     const { token } = await api.getSttToken()
 
-    sttClient = new SttClient(token, { language: appState.settings.listenLang })
+    const sttLang = listenMode === 'auto' ? '' : appState.settings.listenLang
+    sttClient = new SttClient(token, { language: sttLang })
 
     sttClient.onPartialTranscript((text) => {
       if (isNoise(text)) return
@@ -188,7 +194,7 @@ export async function startListening(bridge: any, api: ApiClient): Promise<void>
     sttClient.onCommittedTranscript((text) => {
       partialText = ''
       if (isNoise(text)) return
-      const sourceLang = appState.settings.listenLang
+      const sourceLang = listenMode === 'auto' ? 'auto' : appState.settings.listenLang
       const targetLang = appState.settings.translateLang
 
       api.translate(text, sourceLang, targetLang)
