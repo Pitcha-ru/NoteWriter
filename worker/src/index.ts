@@ -34,7 +34,7 @@ export default {
   },
 } satisfies ExportedHandler<Env>
 
-const VALID_LANGS = new Set(['en', 'el', 'fr', 'de', 'ru'])
+const VALID_LANGS = new Set(['auto', 'en', 'el', 'fr', 'de', 'ru'])
 
 async function handleRequest(request: Request, env: Env, path: string, url: URL): Promise<Response> {
   // Fix 7: Fail fast if ENCRYPTION_KEY is not configured.

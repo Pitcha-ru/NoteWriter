@@ -1,6 +1,6 @@
 import { SettingsPayload } from './types'
 
-const VALID_LANGS = ['en', 'el', 'fr', 'de', 'ru']
+const VALID_LANGS = ['auto', 'en', 'el', 'fr', 'de', 'ru']
 
 export async function getSettings(deviceId: string, db: D1Database): Promise<SettingsPayload | null> {
   return db.prepare('SELECT listen_lang, translate_lang, context, persona FROM settings WHERE device_id = ?')
@@ -12,7 +12,7 @@ export async function updateSettings(deviceId: string, settings: SettingsPayload
   if (!VALID_LANGS.includes(settings.listen_lang) || !VALID_LANGS.includes(settings.translate_lang)) {
     return { error: 'Invalid language. Supported: en, el, fr, de, ru' }
   }
-  if (settings.listen_lang === settings.translate_lang) {
+  if (settings.listen_lang !== 'auto' && settings.listen_lang === settings.translate_lang) {
     return { error: 'Source and target language must differ' }
   }
   await db.prepare('UPDATE settings SET listen_lang = ?, translate_lang = ?, context = ?, persona = ? WHERE device_id = ?')

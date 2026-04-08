@@ -43,10 +43,12 @@ export class SttClient {
       model_id: 'scribe_v2_realtime',
       token: this.token,
       audio_format: 'pcm_16000',
-      language_code: this.config.language,
       commit_strategy: 'vad',
       vad_silence_threshold_secs: '1.0',
     })
+    if (this.config.language && this.config.language !== 'auto') {
+      params.set('language_code', this.config.language)
+    }
     const url = `wss://api.elevenlabs.io/v1/speech-to-text/realtime?${params}`
 
     this.emitStatus('Connecting...')

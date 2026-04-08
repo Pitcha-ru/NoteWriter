@@ -1,5 +1,5 @@
 // Supported languages for STT + translation (Greek supported at service level)
-export type Language = "en" | "el" | "fr" | "de" | "ru";
+export type Language = "en" | "el" | "fr" | "de" | "ru" | "auto";
 
 export interface DialogueMessage {
   role: 'other' | 'self';

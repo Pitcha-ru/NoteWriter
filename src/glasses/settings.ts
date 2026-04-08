@@ -4,8 +4,9 @@ import { appState } from '../services/state'
 import { ApiClient } from '../services/api'
 import type { Language } from '../types'
 
-const LANGUAGES: Language[] = ['en', 'el', 'fr', 'de', 'ru']
-const LANGUAGE_LABELS: Record<Language, string> = { en: 'English', el: 'Greek', fr: 'French', de: 'German', ru: 'Russian' }
+const LISTEN_LANGUAGES: Language[] = ['auto', 'en', 'el', 'fr', 'de', 'ru']
+const TRANSLATE_LANGUAGES: Language[] = ['en', 'el', 'fr', 'de', 'ru']
+const LANGUAGE_LABELS: Record<Language, string> = { auto: 'Auto', en: 'English', el: 'Greek', fr: 'French', de: 'German', ru: 'Russian' }
 
 let selectedIndex = 0
 
@@ -49,20 +50,21 @@ export function handleSettingsEvent(
   }
   if (eventType === 0) { // CLICK — cycle language for selected row
     if (selectedIndex === 0) {
-      const next = nextLanguage(appState.settings.listenLang, appState.settings.translateLang)
+      const next = nextLanguage(appState.settings.listenLang, appState.settings.translateLang, LISTEN_LANGUAGES)
       appState.updateSettings({ listenLang: next })
     } else if (selectedIndex === 1) {
-      const next = nextLanguage(appState.settings.translateLang, appState.settings.listenLang)
+      const next = nextLanguage(appState.settings.translateLang, appState.settings.listenLang, TRANSLATE_LANGUAGES)
       appState.updateSettings({ translateLang: next })
     }
     renderSettings(bridge)
   }
 }
 
-function nextLanguage(current: Language, exclude: Language): Language {
-  const currentIdx = LANGUAGES.indexOf(current)
-  for (let i = 1; i < LANGUAGES.length; i++) {
-    const candidate = LANGUAGES[(currentIdx + i) % LANGUAGES.length]
+function nextLanguage(current: Language, exclude: Language, list: Language[]): Language {
+  const currentIdx = list.indexOf(current)
+  const startIdx = currentIdx >= 0 ? currentIdx : 0
+  for (let i = 1; i < list.length; i++) {
+    const candidate = list[(startIdx + i) % list.length]
     if (candidate !== exclude) return candidate
   }
   return current
