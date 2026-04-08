@@ -118,24 +118,19 @@ async function resumeListening(): Promise<void> {
       committedPairs.push({ original: text, translation: '' })
       updateDisplay()
 
-      let savedParagraphId: string | null = null
-      if (appState.currentSessionId) {
-        currentApi!.appendParagraph(appState.currentSessionId, text, '')
-          .then((para) => { savedParagraphId = para.id })
-          .catch(() => {})
-      }
+      const savePromise = appState.currentSessionId
+        ? currentApi!.appendParagraph(appState.currentSessionId, text, '').then(p => p.id).catch(() => null as string | null)
+        : Promise.resolve(null as string | null)
 
-      const sourceLang = appState.settings.listenLang
-      const targetLang = appState.settings.translateLang
-      currentApi!.translate(text, sourceLang, targetLang)
-        .then((translated) => {
+      const translatePromise = currentApi!.translate(text, appState.settings.listenLang, appState.settings.translateLang).catch(() => '')
+
+      Promise.all([savePromise, translatePromise]).then(([paraId, translated]) => {
+        if (translated) {
           committedPairs[pairIndex].translation = translated
           updateDisplay()
-          if (savedParagraphId) {
-            currentApi!.updateParagraphTranslation(savedParagraphId, translated).catch(() => {})
-          }
-        })
-        .catch(() => {})
+          if (paraId) currentApi!.updateParagraphTranslation(paraId, translated).catch(() => {})
+        }
+      })
     })
 
     sttClient.onError(() => {})
@@ -191,37 +186,31 @@ export async function startListening(bridge: any, api: ApiClient): Promise<void>
       partialText = ''
       if (isNoise(text)) return
 
-      // Show original immediately on display
       const pairIndex = committedPairs.length
       committedPairs.push({ original: text, translation: '' })
       updateDisplay()
 
-      // Save to server immediately (without translation)
-      let savedParagraphId: string | null = null
-      if (appState.currentSessionId) {
-        api.appendParagraph(appState.currentSessionId, text, '')
-          .then((para) => {
-            savedParagraphId = para.id
-            window.dispatchEvent(new CustomEvent('notewriter:session-updated'))
-          })
-          .catch(() => {})
-      }
+      // Save to server + translate in parallel, then update translation
+      const savePromise = appState.currentSessionId
+        ? api.appendParagraph(appState.currentSessionId, text, '')
+            .then((para) => {
+              window.dispatchEvent(new CustomEvent('notewriter:session-updated'))
+              return para.id
+            })
+            .catch(() => null as string | null)
+        : Promise.resolve(null as string | null)
 
-      // Translate in background, update display + server when done
       const sourceLang = appState.settings.listenLang
       const targetLang = appState.settings.translateLang
-      api.translate(text, sourceLang, targetLang)
-        .then((translated) => {
+      const translatePromise = api.translate(text, sourceLang, targetLang).catch(() => '')
+
+      Promise.all([savePromise, translatePromise]).then(([paraId, translated]) => {
+        if (translated) {
           committedPairs[pairIndex].translation = translated
           updateDisplay()
-          // Update paragraph with translation
-          if (savedParagraphId) {
-            api.updateParagraphTranslation(savedParagraphId, translated).catch(() => {})
-          }
-        })
-        .catch(() => {
-          // Translation failed — original is already saved
-        })
+          if (paraId) api.updateParagraphTranslation(paraId, translated).catch(() => {})
+        }
+      })
     })
 
     sttClient.onError(() => {})

@@ -100,25 +100,25 @@ async function startAudio(api: ApiClient): Promise<void> {
     // Trim history to max 15 turns
     if (conversationHistory.length > 15) conversationHistory = conversationHistory.slice(-15)
 
-    // Save immediately, translate in background
     const pairIndex = committedPairs.length
     committedPairs.push({ original: text, translation: '' })
     updateDisplay()
 
-    let savedParaId: string | null = null
-    if (appState.currentSessionId) {
-      api.appendParagraph(appState.currentSessionId, text, '')
-        .then((p) => { savedParaId = p.id; window.dispatchEvent(new CustomEvent('notewriter:session-updated')) })
-        .catch(() => {})
-    }
+    const savePromise = appState.currentSessionId
+      ? api.appendParagraph(appState.currentSessionId, text, '')
+          .then(p => { window.dispatchEvent(new CustomEvent('notewriter:session-updated')); return p.id })
+          .catch(() => null as string | null)
+      : Promise.resolve(null as string | null)
 
-    api.translate(text, appState.settings.listenLang, appState.settings.translateLang)
-      .then((translated) => {
+    const translatePromise = api.translate(text, appState.settings.listenLang, appState.settings.translateLang).catch(() => '')
+
+    Promise.all([savePromise, translatePromise]).then(([paraId, translated]) => {
+      if (translated) {
         committedPairs[pairIndex].translation = translated
         updateDisplay()
-        if (savedParaId) api.updateParagraphTranslation(savedParaId, translated).catch(() => {})
-      })
-      .catch(() => {})
+        if (paraId) api.updateParagraphTranslation(paraId, translated).catch(() => {})
+      }
+    })
   })
 
   sttClient.onError(() => {})

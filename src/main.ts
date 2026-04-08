@@ -50,7 +50,7 @@ async function init() {
     appState.openaiKeyConfigured = k.openaiKey !== null
   } catch {}
 
-  // Don't show menu automatically — wait for Start button from phone UI
+  showMenu(bridge)
 
   // Listen for phone UI changes (both scripts run on same page)
   window.addEventListener('notewriter:keys-changed', async () => {
