@@ -210,8 +210,8 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
     }
     if (request.method === 'PATCH') {
       const body = await request.json<{ original: string; translation: string }>()
-      if (!body.original || !body.translation) {
-        return json({ error: 'original and translation are required non-empty strings' }, 400)
+      if (!body.original) {
+        return json({ error: 'original text is required' }, 400)
       }
       try {
         const paragraph = await appendParagraph(sessionId, deviceId, body.original, body.translation, env.DB)
