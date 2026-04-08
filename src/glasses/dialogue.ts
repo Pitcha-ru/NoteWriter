@@ -19,6 +19,12 @@ let lastAnswer = { response: '', translation: '' }
 let indicatorTimer: ReturnType<typeof setInterval> | null = null
 let indicatorFrame = 0
 
+let saveQueue: Promise<any> = Promise.resolve()
+
+function enqueueSave(fn: () => Promise<any>): void {
+  saveQueue = saveQueue.then(fn, fn)
+}
+
 function splitIntoChunks(text: string, maxLen = 120): string[] {
   if (text.length <= maxLen) return [text]
   const sentences = text.match(/[^.!?;]+[.!?;]+\s*/g) || [text]
@@ -50,6 +56,7 @@ function resetState(): void {
   lastAnswer = { response: '', translation: '' }
   dialogueState = 'listening'
   indicatorFrame = 0
+  saveQueue = Promise.resolve()
   if (indicatorTimer) { clearInterval(indicatorTimer); indicatorTimer = null }
 }
 
@@ -131,19 +138,24 @@ async function startAudio(api: ApiClient): Promise<void> {
       committedPairs.push({ original: chunk, translation: '' })
       updateDisplay()
 
-      const saveP = appState.currentSessionId
-        ? api.appendParagraph(appState.currentSessionId, chunk, '')
-            .then(p => { window.dispatchEvent(new CustomEvent('notewriter:session-updated')); return p.id })
-            .catch(() => null as string | null)
-        : Promise.resolve(null as string | null)
-      const transP = api.translate(chunk, appState.settings.listenLang, appState.settings.translateLang).catch(() => '')
-
-      Promise.all([saveP, transP]).then(([paraId, translated]) => {
-        if (translated) {
-          committedPairs[idx].translation = translated
-          updateDisplay()
-          if (paraId) api.updateParagraphTranslation(paraId, translated).catch(() => {})
+      enqueueSave(async () => {
+        const sessionId = appState.currentSessionId
+        let paraId: string | null = null
+        if (sessionId) {
+          try {
+            const p = await api.appendParagraph(sessionId, chunk, '')
+            paraId = p.id
+            window.dispatchEvent(new CustomEvent('notewriter:session-updated'))
+          } catch {}
         }
+        try {
+          const translated = await api.translate(chunk, appState.settings.listenLang, appState.settings.translateLang)
+          if (translated) {
+            committedPairs[idx].translation = translated
+            updateDisplay()
+            if (paraId) api.updateParagraphTranslation(paraId, translated).catch(() => {})
+          }
+        } catch {}
       })
     }
   })
