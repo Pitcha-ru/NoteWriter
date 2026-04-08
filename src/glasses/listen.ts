@@ -182,6 +182,8 @@ function fullStop(): void {
 export function resetListen(): void {
   fullStop()
   resetListenState()
+  currentBridge = null  // prevent stale promises from overwriting display
+  currentApi = null
 }
 
 export async function startListening(bridge: any, api: ApiClient): Promise<void> {

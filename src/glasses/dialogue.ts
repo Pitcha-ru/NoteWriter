@@ -105,6 +105,8 @@ export function resetDialogue(): void {
   stopIndicator()
   stopAudio()
   resetState()
+  currentBridge = null
+  currentApi = null
 }
 
 async function startAudio(api: ApiClient): Promise<void> {
