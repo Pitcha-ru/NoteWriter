@@ -74,7 +74,7 @@ export async function streamDialogueResponse(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-4.1-nano',
+      model: 'gpt-4.1-mini',
       messages,
       stream: true,
       max_tokens: 200,
