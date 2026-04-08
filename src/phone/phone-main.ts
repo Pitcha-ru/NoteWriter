@@ -57,25 +57,49 @@ function initStartStop(): void {
   const btn = document.getElementById('glasses-start-btn') as HTMLButtonElement
   let running = false
 
-  btn.addEventListener('click', () => {
-    running = !running
-    if (running) {
+  function setDisabled(disabled: boolean): void {
+    btn.disabled = disabled
+    btn.style.opacity = disabled ? '0.4' : '1'
+  }
+
+  function setRunning(on: boolean): void {
+    running = on
+    if (on) {
       btn.textContent = 'Stop'
       btn.style.background = '#d44'
-      window.dispatchEvent(new CustomEvent('notewriter:glasses-start'))
     } else {
       btn.textContent = 'Start'
       btn.style.background = '#34c759'
+    }
+  }
+
+  // Check if keys are configured
+  async function checkKeys(): Promise<void> {
+    try {
+      const keys = await api.getKeys()
+      const hasKeys = keys.elevenlabsKey !== null && keys.awsAccessKeyId !== null
+      setDisabled(!hasKeys)
+    } catch {
+      setDisabled(true)
+    }
+  }
+
+  void checkKeys()
+  window.addEventListener('notewriter:keys-changed', () => void checkKeys())
+
+  btn.addEventListener('click', () => {
+    if (btn.disabled) return
+    if (!running) {
+      setRunning(true)
+      window.dispatchEvent(new CustomEvent('notewriter:glasses-start'))
+    } else {
+      setRunning(false)
       window.dispatchEvent(new CustomEvent('notewriter:glasses-stop'))
     }
   })
 
-  // Sync if glasses stop themselves (e.g. double-click exit)
-  window.addEventListener('notewriter:glasses-stopped', () => {
-    running = false
-    btn.textContent = 'Start'
-    btn.style.background = '#34c759'
-  })
+  // Sync if glasses stop themselves
+  window.addEventListener('notewriter:glasses-stopped', () => setRunning(false))
 }
 
 if (trySetToken()) {

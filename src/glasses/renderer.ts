@@ -7,7 +7,12 @@ import {
 } from '@evenrealities/even_hub_sdk'
 
 // createStartUpPageContainer must be called exactly ONCE. After that, only rebuildPageContainer.
+// After shutDownPageContainer, reset so next setPageContent calls create again.
 let pageCreated = false
+
+export function resetPage(): void {
+  pageCreated = false
+}
 
 /**
  * Display/update a text page on the glasses.

@@ -6,6 +6,7 @@ import { startListening, handleListenEvent, handleAudioData } from './glasses/li
 import { startDialogue, handleDialogueEvent, handleDialogueAudio } from './glasses/dialogue'
 import { showHistoryList, handleHistoryListEvent, handleHistoryDetailEvent } from './glasses/history'
 import { showSettings, handleSettingsEvent } from './glasses/settings'
+import { resetPage } from './glasses/renderer'
 
 const WORKER_URL = 'https://notewriter-worker.kiwibudka.workers.dev'
 const api = new ApiClient(WORKER_URL)
@@ -49,7 +50,7 @@ async function init() {
     appState.openaiKeyConfigured = k.openaiKey !== null
   } catch {}
 
-  showMenu(bridge)
+  // Don't show menu automatically — wait for Start button from phone UI
 
   // Listen for phone UI changes (both scripts run on same page)
   window.addEventListener('notewriter:keys-changed', async () => {
@@ -78,12 +79,13 @@ async function init() {
 
   // Phone Start/Stop button
   window.addEventListener('notewriter:glasses-start', () => {
+    resetPage()
     showMenu(bridge)
   })
 
   window.addEventListener('notewriter:glasses-stop', () => {
-    // Shut down any active mode and close glasses display
     try { bridge.shutDownPageContainer(0) } catch {}
+    resetPage()
   })
 
   // Block click events briefly after screen transitions
