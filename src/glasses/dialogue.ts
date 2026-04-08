@@ -211,7 +211,15 @@ export function handleDialogueEvent(bridge: any, eventType: number, api: ApiClie
 
   switch (dialogueState) {
     case 'listening':
-      if (eventType === 0 && conversationHistory.length > 0) generateAnswer()
+      if (eventType === 0) {
+        // Use partial text if no committed text yet
+        if (partialText && !isNoise(partialText)) {
+          conversationHistory.push({ role: 'other', text: partialText })
+          if (conversationHistory.length > 15) conversationHistory = conversationHistory.slice(-15)
+          partialText = ''
+        }
+        if (conversationHistory.length > 0) generateAnswer()
+      }
       break
     case 'showing_answer':
       if (eventType === 0) {

@@ -64,9 +64,8 @@ async function init() {
   })
 
   window.addEventListener('notewriter:settings-changed', (e: any) => {
-    const { listenLang, translateLang } = e.detail
-    appState.updateSettings({ listenLang, translateLang })
-    // Refresh settings screen if we're on it
+    const { listenLang, translateLang, context, persona } = e.detail
+    appState.updateSettings({ listenLang, translateLang, context: context ?? appState.settings.context, persona: persona ?? appState.settings.persona })
     if (appState.currentScreen === 'settings') showSettings(bridge)
   })
 
