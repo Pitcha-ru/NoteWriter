@@ -135,6 +135,11 @@ async function init() {
         onDialogue: () => navigateWithGuard(() => startDialogue(bridge, api)),
         onHistory: () => navigateWithGuard(() => showHistoryList(bridge, api)),
         onSettings: () => navigateWithGuard(() => showSettings(bridge)),
+        onExit: () => {
+          try { bridge.shutDownPageContainer(0) } catch {}
+          resetPage()
+          window.dispatchEvent(new CustomEvent('notewriter:glasses-stopped'))
+        },
       }); break
       case 'listen': handleListenEvent(bridge, eventType, api, () => navigateWithGuard(() => showMenu(bridge))); break
       case 'dialogue': handleDialogueEvent(bridge, eventType, api, () => navigateWithGuard(() => showMenu(bridge))); break

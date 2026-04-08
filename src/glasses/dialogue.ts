@@ -181,6 +181,14 @@ export async function startDialogue(bridge: any, api: ApiClient): Promise<void> 
 }
 
 export function handleDialogueEvent(bridge: any, eventType: number, api: ApiClient, onBack: () => void): void {
+  // Double-click from ANY state → exit to menu
+  if (eventType === 3) {
+    stopIndicator()
+    stopAudio()
+    onBack()
+    return
+  }
+
   switch (dialogueState) {
     case 'listening':
       if (eventType === 0 && conversationHistory.length > 0) generateAnswer()
@@ -192,7 +200,6 @@ export function handleDialogueEvent(bridge: any, eventType: number, api: ApiClie
         partialText = ''
         startAudio(api).then(() => { startIndicator(); updateDisplay() })
       }
-      if (eventType === 3) { dialogueState = 'paused'; updateDisplay() }
       break
     case 'paused':
       if (eventType === 0) {
@@ -201,7 +208,6 @@ export function handleDialogueEvent(bridge: any, eventType: number, api: ApiClie
         partialText = ''
         startAudio(api).then(() => { startIndicator(); updateDisplay() })
       }
-      if (eventType === 3) { stopIndicator(); stopAudio(); onBack() }
       break
     case 'generating':
       break

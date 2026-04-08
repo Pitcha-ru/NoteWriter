@@ -232,21 +232,16 @@ export function handleListenEvent(
   api: ApiClient,
   onBack: () => void
 ): void {
+  // Double-click from ANY state → exit to menu
+  if (eventType === 3) {
+    fullStop()
+    onBack()
+    return
+  }
   if (listenState === 'active') {
-    // Click → pause
-    if (eventType === 0) {
-      pauseListening()
-    }
+    if (eventType === 0) pauseListening() // Click → pause
   } else if (listenState === 'paused') {
-    // Click → resume
-    if (eventType === 0) {
-      resumeListening()
-    }
-    // Double-click → exit to menu
-    if (eventType === 3) {
-      fullStop()
-      onBack()
-    }
+    if (eventType === 0) resumeListening() // Click → resume
   }
 }
 

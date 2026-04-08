@@ -49,9 +49,21 @@ export function setPageContent(bridge: any, content: string): void {
 
 /**
  * Incrementally update the text of a container that has already been created.
+ * Truncates content to fit on screen to prevent native scroll.
  */
 export function updateText(bridge: any, containerId: number, text: string): void {
-  const truncated = text.length > 2000 ? text.slice(-2000) : text
+  // Limit to MAX_DISPLAY_LINES to prevent native scroll
+  const lines = text.split('\n')
+  const fitted: string[] = []
+  let usedLines = 0
+  for (const line of lines) {
+    const lineCount = Math.max(1, Math.ceil(line.length / CHARS_PER_LINE))
+    if (usedLines + lineCount > MAX_DISPLAY_LINES) break
+    fitted.push(line)
+    usedLines += lineCount
+  }
+  const content = fitted.join('\n')
+  const truncated = content.length > 2000 ? content.slice(-2000) : content
   bridge.textContainerUpgrade(
     new TextContainerUpgrade({
       containerID: containerId,

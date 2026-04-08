@@ -29,9 +29,13 @@ export function handleMenuEvent(
   bridge: any,
   eventType: number,
   _selectedIndex: number,
-  callbacks: { onListen: () => void; onDialogue: () => void; onHistory: () => void; onSettings: () => void }
+  callbacks: { onListen: () => void; onDialogue: () => void; onHistory: () => void; onSettings: () => void; onExit: () => void }
 ): void {
-  // SCROLL_TOP (1) = move cursor up, SCROLL_BOTTOM (2) = move cursor down, CLICK (0) = select
+  // DOUBLE_CLICK (3) = shut down display
+  if (eventType === 3) {
+    callbacks.onExit()
+    return
+  }
   if (eventType === 1) {
     selectedIndex = Math.max(0, selectedIndex - 1)
     renderMenu(bridge)
