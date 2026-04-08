@@ -57,9 +57,12 @@ function initStartStop(): void {
   const btn = document.getElementById('glasses-start-btn') as HTMLButtonElement
   let running = false
 
+  const hint = document.getElementById('start-hint') as HTMLElement
+
   function setDisabled(disabled: boolean): void {
     btn.disabled = disabled
     btn.style.opacity = disabled ? '0.4' : '1'
+    hint.style.display = disabled ? 'block' : 'none'
   }
 
   function setRunning(on: boolean): void {
