@@ -119,8 +119,22 @@ export function formatListenDisplay(
 }
 
 /**
+ * Truncate text to fit within maxLines, breaking at word boundaries.
+ */
+function truncateToFit(text: string, maxLines: number): string {
+  const words = text.split(/\s+/)
+  let result = ''
+  for (const word of words) {
+    const candidate = result ? `${result} ${word}` : word
+    if (estimateLines(candidate) > maxLines) break
+    result = candidate
+  }
+  return result || text.slice(0, CHARS_PER_LINE * maxLines)
+}
+
+/**
  * Show as many paragraphs as fit on screen starting from currentIndex.
- * Returns the formatted text and how many paragraphs were shown.
+ * Long paragraphs are truncated to fit. Returns formatted text and count shown.
  */
 export function formatHistoryDetail(
   paragraphs: Array<{ original: string; translation: string }>,
@@ -128,17 +142,34 @@ export function formatHistoryDetail(
 ): { text: string; shown: number } {
   if (!paragraphs[currentIndex]) return { text: '', shown: 0 }
 
+  const maxContent = MAX_DISPLAY_LINES - 1 // reserve 1 line for page indicator
   const parts: string[] = []
-  let linesUsed = 1 // reserve 1 line for page indicator
+  let linesUsed = 0
   let count = 0
 
   for (let i = currentIndex; i < paragraphs.length; i++) {
     const p = paragraphs[i]
-    const block = p.translation
-      ? `${p.original}\n${p.translation}`
-      : p.original
-    const blockLines = estimateLines(block) + (parts.length > 0 ? 1 : 0) // +1 separator between blocks
-    if (linesUsed + blockLines > MAX_DISPLAY_LINES && count > 0) break
+    const remaining = maxContent - linesUsed
+    if (remaining <= 0 && count > 0) break
+
+    let orig = p.original
+    let trans = p.translation
+
+    // If this is the first item and it's long, truncate to fit screen
+    const fullBlock = trans ? `${orig}\n${trans}` : orig
+    const fullLines = estimateLines(fullBlock) + (count > 0 ? 1 : 0)
+
+    if (linesUsed + fullLines > maxContent) {
+      if (count > 0) break // skip if we already have content
+      // Truncate first (and only) paragraph to fit
+      const linesForOrig = trans ? Math.ceil(remaining / 2) : remaining
+      const linesForTrans = remaining - linesForOrig
+      orig = truncateToFit(orig, linesForOrig)
+      if (trans) trans = truncateToFit(trans, linesForTrans)
+    }
+
+    const block = trans ? `${orig}\n${trans}` : orig
+    const blockLines = estimateLines(block) + (count > 0 ? 1 : 0)
     linesUsed += blockLines
     parts.push(block)
     count++

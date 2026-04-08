@@ -19,6 +19,23 @@ let lastAnswer = { response: '', translation: '' }
 let indicatorTimer: ReturnType<typeof setInterval> | null = null
 let indicatorFrame = 0
 
+function splitIntoChunks(text: string, maxLen = 120): string[] {
+  if (text.length <= maxLen) return [text]
+  const sentences = text.match(/[^.!?;]+[.!?;]+\s*/g) || [text]
+  const chunks: string[] = []
+  let current = ''
+  for (const s of sentences) {
+    if (current.length + s.length > maxLen && current) {
+      chunks.push(current.trim())
+      current = s
+    } else {
+      current += s
+    }
+  }
+  if (current.trim()) chunks.push(current.trim())
+  return chunks.length > 0 ? chunks : [text]
+}
+
 function isNoise(text: string): boolean {
   const t = text.trim()
   if (!t) return true
@@ -97,28 +114,29 @@ async function startAudio(api: ApiClient): Promise<void> {
     partialText = ''
     if (isNoise(text)) return
     conversationHistory.push({ role: 'other', text })
-    // Trim history to max 15 turns
     if (conversationHistory.length > 15) conversationHistory = conversationHistory.slice(-15)
 
-    const pairIndex = committedPairs.length
-    committedPairs.push({ original: text, translation: '' })
-    updateDisplay()
+    const chunks = splitIntoChunks(text)
+    for (const chunk of chunks) {
+      const idx = committedPairs.length
+      committedPairs.push({ original: chunk, translation: '' })
+      updateDisplay()
 
-    const savePromise = appState.currentSessionId
-      ? api.appendParagraph(appState.currentSessionId, text, '')
-          .then(p => { window.dispatchEvent(new CustomEvent('notewriter:session-updated')); return p.id })
-          .catch(() => null as string | null)
-      : Promise.resolve(null as string | null)
+      const saveP = appState.currentSessionId
+        ? api.appendParagraph(appState.currentSessionId, chunk, '')
+            .then(p => { window.dispatchEvent(new CustomEvent('notewriter:session-updated')); return p.id })
+            .catch(() => null as string | null)
+        : Promise.resolve(null as string | null)
+      const transP = api.translate(chunk, appState.settings.listenLang, appState.settings.translateLang).catch(() => '')
 
-    const translatePromise = api.translate(text, appState.settings.listenLang, appState.settings.translateLang).catch(() => '')
-
-    Promise.all([savePromise, translatePromise]).then(([paraId, translated]) => {
-      if (translated) {
-        committedPairs[pairIndex].translation = translated
-        updateDisplay()
-        if (paraId) api.updateParagraphTranslation(paraId, translated).catch(() => {})
-      }
-    })
+      Promise.all([saveP, transP]).then(([paraId, translated]) => {
+        if (translated) {
+          committedPairs[idx].translation = translated
+          updateDisplay()
+          if (paraId) api.updateParagraphTranslation(paraId, translated).catch(() => {})
+        }
+      })
+    }
   })
 
   sttClient.onError(() => {})
