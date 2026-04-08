@@ -58,7 +58,9 @@
       "Bash(pkill -f \"evenhub-simulator\")",
       "Bash(python3 -c \" import json, sys data = json.load\\(sys.stdin\\) for path, methods in data.get\\('paths', {}\\).items\\(\\): if 'speech-to-text' in path.lower\\(\\) or 'stt' in path.lower\\(\\) or 'websocket-token' in path.lower\\(\\) or 'scribe' in path.lower\\(\\): for method in methods: print\\(f'{method.upper\\(\\)} {path}'\\) \")",
       "WebFetch(domain:github.com)",
-      "Bash(python3 -m json.tool)"
+      "Bash(python3 -m json.tool)",
+      "Bash(evenhub pack:*)",
+      "Bash(/opt/homebrew/bin/gh release create v1.0.0 notewriter.ehpk --title 'NoteWriter v1.0.0' --notes ':*)"
     ]
   }
 }
