@@ -82,7 +82,7 @@ export async function streamDialogueResponse(
       model: 'gpt-4o',
       messages,
       stream: true,
-      max_tokens: 200,
+      max_tokens: 500,
       temperature: 0.7,
     }),
   })
