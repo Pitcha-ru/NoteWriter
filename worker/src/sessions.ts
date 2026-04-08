@@ -74,6 +74,11 @@ export async function appendParagraph(sessionId: string, deviceId: string, origi
   return { id, session_id: sessionId, position: pos, original, translation }
 }
 
+export async function updateParagraphTranslation(paragraphId: string, translation: string, db: D1Database): Promise<boolean> {
+  const result = await db.prepare('UPDATE paragraphs SET translation = ? WHERE id = ?').bind(translation, paragraphId).run()
+  return result.meta.changes > 0
+}
+
 export async function deleteSession(sessionId: string, deviceId: string, db: D1Database): Promise<boolean> {
   const result = await db.prepare('DELETE FROM sessions WHERE id = ? AND device_id = ?').bind(sessionId, deviceId).run()
   return result.meta.changes > 0

@@ -132,6 +132,9 @@ export class ApiClient {
   async appendParagraph(sessionId: string, original: string, translation: string): Promise<Paragraph> {
     return this.request(`/api/sessions/${sessionId}`, { method: 'PATCH', body: JSON.stringify({ original, translation }) })
   }
+  async updateParagraphTranslation(paragraphId: string, translation: string): Promise<void> {
+    await this.request(`/api/paragraphs/${paragraphId}`, { method: 'PUT', body: JSON.stringify({ translation }) })
+  }
   async deleteSession(id: string): Promise<void> { await this.request(`/api/sessions/${id}`, { method: 'DELETE' }) }
   async getKeys(): Promise<MaskedKeys> { return this.request('/api/keys') }
   async saveKeys(keys: ApiKeys): Promise<void> { await this.request('/api/keys', { method: 'PUT', body: JSON.stringify(toSnake(keys)) }) }

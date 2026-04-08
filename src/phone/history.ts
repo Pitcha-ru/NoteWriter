@@ -41,6 +41,7 @@ function langName(code: string): string {
 let listCursor: string | null = null
 let detailSessionId: string | null = null
 let detailCursor: number | undefined = undefined
+let lastSession: Session | null = null
 
 export function initHistory(api: ApiClient, showToast: ShowToast): void {
   const listView      = document.getElementById('history-list-view')  as HTMLDivElement
@@ -160,14 +161,34 @@ export function initHistory(api: ApiClient, showToast: ShowToast): void {
   function renderParagraph(para: Paragraph): HTMLElement {
     const div = document.createElement('div')
     div.className = 'paragraph-block'
+    const translationHtml = para.translation
+      ? escapeHtml(para.translation)
+      : '<span style="color:#ccc;font-style:italic">Translating...</span>'
     div.innerHTML = `
       <div class="para-original">${escapeHtml(para.original)}</div>
-      <div class="para-translation">${escapeHtml(para.translation)}</div>
+      <div class="para-translation" data-para-id="${escapeHtml(para.id)}">${translationHtml}</div>
     `
+
+    // If translation is empty, translate on the fly
+    if (!para.translation && para.original) {
+      api.translate(para.original, 'auto', lastSession?.translateLang ?? 'en')
+        .then((translated) => {
+          const el = div.querySelector('.para-translation')
+          if (el) el.textContent = translated
+          // Save translation to server
+          api.updateParagraphTranslation(para.id, translated).catch(() => {})
+        })
+        .catch(() => {
+          const el = div.querySelector('.para-translation')
+          if (el) el.innerHTML = '<span style="color:#ccc">Translation unavailable</span>'
+        })
+    }
+
     return div
   }
 
   async function openSession(session: Session): Promise<void> {
+    lastSession = session
     detailSessionId = session.id
     detailCursor = undefined
     paraContainer.innerHTML = '<p class="empty-msg">Loading…</p>'

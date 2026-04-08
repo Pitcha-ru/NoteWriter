@@ -4,7 +4,7 @@ import { getKeys, saveKeys, getMaskedKeys, deleteKeys, getCachedKeys } from './k
 import { mintSttToken } from './stt-token'
 import { translateText } from './translate'
 import { getSettings, updateSettings } from './settings'
-import { createSession, listSessions, getSession, appendParagraph, deleteSession } from './sessions'
+import { createSession, listSessions, getSession, appendParagraph, updateParagraphTranslation, deleteSession } from './sessions'
 import { buildOpenAIMessages, streamDialogueResponse } from './dialogue'
 
 export default {
@@ -164,6 +164,16 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
     } catch (err) {
       return json({ error: err instanceof Error ? err.message : 'Generation failed' }, 502)
     }
+  }
+
+  // Paragraph translation update
+  const paragraphMatch = path.match(/^\/api\/paragraphs\/([^/]+)$/)
+  if (paragraphMatch && request.method === 'PUT') {
+    const paraId = paragraphMatch[1]
+    const body = await request.json<{ translation: string }>()
+    if (!body.translation) return json({ error: 'translation required' }, 400)
+    await updateParagraphTranslation(paraId, body.translation, env.DB)
+    return json({ ok: true })
   }
 
   // Session routes

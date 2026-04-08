@@ -113,27 +113,29 @@ async function resumeListening(): Promise<void> {
 
     sttClient.onCommittedTranscript((text) => {
       partialText = ''
+      if (isNoise(text)) return
+      const pairIndex = committedPairs.length
+      committedPairs.push({ original: text, translation: '' })
+      updateDisplay()
+
+      let savedParagraphId: string | null = null
+      if (appState.currentSessionId) {
+        currentApi!.appendParagraph(appState.currentSessionId, text, '')
+          .then((para) => { savedParagraphId = para.id })
+          .catch(() => {})
+      }
+
       const sourceLang = appState.settings.listenLang
       const targetLang = appState.settings.translateLang
-
       currentApi!.translate(text, sourceLang, targetLang)
         .then((translated) => {
-          committedPairs.push({ original: text, translation: translated })
+          committedPairs[pairIndex].translation = translated
           updateDisplay()
-          // Save immediately to server
-          if (appState.currentSessionId) {
-            currentApi!.appendParagraph(appState.currentSessionId, text, translated).catch(() => {})
+          if (savedParagraphId) {
+            currentApi!.updateParagraphTranslation(savedParagraphId, translated).catch(() => {})
           }
         })
-        .catch((err) => {
-          const errMsg = err instanceof Error ? err.message : String(err)
-          committedPairs.push({ original: text, translation: `[ERR: ${errMsg.slice(0, 60)}]` })
-          updateDisplay()
-          // Save original even if translation failed
-          if (appState.currentSessionId) {
-            currentApi!.appendParagraph(appState.currentSessionId, text, '').catch(() => {})
-          }
-        })
+        .catch(() => {})
     })
 
     sttClient.onError(() => {})
@@ -188,28 +190,37 @@ export async function startListening(bridge: any, api: ApiClient): Promise<void>
     sttClient.onCommittedTranscript((text) => {
       partialText = ''
       if (isNoise(text)) return
+
+      // Show original immediately on display
+      const pairIndex = committedPairs.length
+      committedPairs.push({ original: text, translation: '' })
+      updateDisplay()
+
+      // Save to server immediately (without translation)
+      let savedParagraphId: string | null = null
+      if (appState.currentSessionId) {
+        api.appendParagraph(appState.currentSessionId, text, '')
+          .then((para) => {
+            savedParagraphId = para.id
+            window.dispatchEvent(new CustomEvent('notewriter:session-updated'))
+          })
+          .catch(() => {})
+      }
+
+      // Translate in background, update display + server when done
       const sourceLang = appState.settings.listenLang
       const targetLang = appState.settings.translateLang
-
       api.translate(text, sourceLang, targetLang)
         .then((translated) => {
-          committedPairs.push({ original: text, translation: translated })
+          committedPairs[pairIndex].translation = translated
           updateDisplay()
-          // Save immediately to server
-          if (appState.currentSessionId) {
-            api.appendParagraph(appState.currentSessionId, text, translated)
-              .then(() => window.dispatchEvent(new CustomEvent('notewriter:session-updated')))
-              .catch(() => {})
+          // Update paragraph with translation
+          if (savedParagraphId) {
+            api.updateParagraphTranslation(savedParagraphId, translated).catch(() => {})
           }
         })
-        .catch((err) => {
-          const errMsg = err instanceof Error ? err.message : String(err)
-          committedPairs.push({ original: text, translation: `[ERR: ${errMsg.slice(0, 60)}]` })
-          updateDisplay()
-          // Save original even if translation failed
-          if (appState.currentSessionId) {
-            api.appendParagraph(appState.currentSessionId, text, '').catch(() => {})
-          }
+        .catch(() => {
+          // Translation failed — original is already saved
         })
     })
 
