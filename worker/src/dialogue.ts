@@ -8,23 +8,29 @@ export function buildOpenAIMessages(
   messages: DialogueRequest['messages'],
   context: string,
   persona: string,
+  sourceLangName: string,
   targetLangName: string
 ): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
-  const systemPrompt = `You are a dialogue assistant. You help the user respond in conversations.
+  const systemPrompt = `You are generating spoken dialogue responses.
 
-Context: ${context || 'General conversation'}
-Persona: ${persona || 'A friendly person'}
+The conversation is in ${sourceLangName}. You MUST write the response in correct, natural, grammatically proper ${sourceLangName}.
 
-Rules:
-- Generate a response as if you ARE the persona
-- Respond in the SAME language as the last question/statement
-- Keep responses short (1-3 sentences), appropriate for spoken dialogue
-- If the persona description doesn't cover the topic, improvise naturally within the given context
-- After the response, add a translation to ${targetLangName}
+About the person you are speaking as:
+${persona || 'A friendly person.'}
 
-Format your response EXACTLY as:
-RESPONSE: [your response in the original language]
-TRANSLATION: [translation to ${targetLangName}]`
+Situation:
+${context || 'General conversation.'}
+
+CRITICAL RULES:
+1. Write the response ONLY in ${sourceLangName}. It must be fluent and grammatically correct ${sourceLangName}, as a native speaker would say it.
+2. Keep it short: 1-3 sentences, suitable for spoken dialogue.
+3. If the persona info doesn't cover the question, make up a plausible answer fitting the context.
+4. After a blank line, write the ${targetLangName} translation.
+
+Output format (no labels, no "RESPONSE:", no "TRANSLATION:"):
+[Your response in ${sourceLangName}]
+
+[Translation in ${targetLangName}]`
 
   const openaiMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
     { role: 'system', content: systemPrompt },
@@ -37,15 +43,24 @@ TRANSLATION: [translation to ${targetLangName}]`
 }
 
 export function parseDialogueResponse(text: string): { response: string; translation: string } {
-  const responseMatch = text.match(/RESPONSE:\s*(.+?)(?:\nTRANSLATION:|$)/s)
-  const translationMatch = text.match(/TRANSLATION:\s*(.+?)$/s)
-  if (responseMatch) {
-    return {
-      response: responseMatch[1].trim(),
-      translation: translationMatch ? translationMatch[1].trim() : '',
-    }
+  const t = text.trim()
+
+  // Try RESPONSE:/TRANSLATION: markers first
+  const markerMatch = t.match(/^RESPONSE:?\s*([\s\S]*?)\nTRANSLATION:?\s*([\s\S]*)$/i)
+  if (markerMatch) {
+    return { response: markerMatch[1].trim(), translation: markerMatch[2].trim() }
   }
-  return { response: text.trim(), translation: '' }
+
+  // Split on blank line (double newline)
+  const parts = t.split(/\n\s*\n/)
+  if (parts.length >= 2) {
+    const response = parts[0].replace(/^RESPONSE:?\s*/i, '').trim()
+    const translation = parts.slice(1).join('\n').replace(/^TRANSLATION:?\s*/i, '').trim()
+    return { response, translation }
+  }
+
+  // No separation found — strip any markers and return as response only
+  return { response: t.replace(/^RESPONSE:?\s*/i, '').trim(), translation: '' }
 }
 
 export async function streamDialogueResponse(

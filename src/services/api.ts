@@ -116,18 +116,27 @@ export class ApiClient {
       }
     }
 
-    // Parse RESPONSE/TRANSLATION markers (flexible: with or without colon)
-    const responseMatch = accumulated.match(/RESPONSE:?\s*([\s\S]*?)(?=\nTRANSLATION|$)/i)
-    const translationMatch = accumulated.match(/TRANSLATION:?\s*([\s\S]*)$/i)
+    // Clean any markers
+    let clean = accumulated
+      .replace(/^RESPONSE:?\s*/i, '')
+      .trim()
 
-    let response = responseMatch ? responseMatch[1].trim() : accumulated.trim()
-    let translation = translationMatch ? translationMatch[1].trim() : ''
+    // Split on blank line (response / translation separated by empty line)
+    const parts = clean.split(/\n\s*\n/)
+    if (parts.length >= 2) {
+      const response = parts[0].replace(/^RESPONSE:?\s*/i, '').trim()
+      const translation = parts.slice(1).join('\n').replace(/^TRANSLATION:?\s*/i, '').trim()
+      return { response, translation }
+    }
 
-    // Strip any remaining markers
-    response = response.replace(/^RESPONSE:?\s*/i, '').replace(/\nTRANSLATION:?\s*[\s\S]*$/i, '').trim()
-    translation = translation.replace(/^TRANSLATION:?\s*/i, '').trim()
+    // Fallback: try markers
+    const rm = clean.match(/RESPONSE:?\s*([\s\S]*?)(?=\nTRANSLATION|$)/i)
+    const tm = clean.match(/TRANSLATION:?\s*([\s\S]*)$/i)
+    if (rm) {
+      return { response: rm[1].trim(), translation: tm ? tm[1].trim() : '' }
+    }
 
-    return { response, translation }
+    return { response: clean, translation: '' }
   }
   async appendParagraph(sessionId: string, original: string, translation: string): Promise<Paragraph> {
     return this.request(`/api/sessions/${sessionId}`, { method: 'PATCH', body: JSON.stringify({ original, translation }) })

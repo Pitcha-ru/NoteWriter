@@ -150,8 +150,10 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
     if (!body.messages?.length) return json({ error: 'messages required' }, 400)
     const keys = await getCachedKeys(deviceId, env.KV, env.ENCRYPTION_KEY)
     if (!keys?.openai_key) return json({ error: 'OpenAI key not configured' }, 400)
-    const targetLangName = { en: 'English', el: 'Greek', fr: 'French', de: 'German', ru: 'Russian' }[body.target_lang] ?? body.target_lang
-    const openaiMessages = buildOpenAIMessages(body.messages, body.context, body.persona, targetLangName)
+    const langNames: Record<string, string> = { en: 'English', el: 'Greek', fr: 'French', de: 'German', ru: 'Russian', auto: 'the same language as the question' }
+    const sourceLangName = langNames[body.source_lang] ?? body.source_lang
+    const targetLangName = langNames[body.target_lang] ?? body.target_lang
+    const openaiMessages = buildOpenAIMessages(body.messages, body.context, body.persona, sourceLangName, targetLangName)
     try {
       const streamResponse = await streamDialogueResponse(openaiMessages, keys.openai_key)
       if (!streamResponse.ok) {
