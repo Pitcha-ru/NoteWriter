@@ -116,27 +116,21 @@ export class ApiClient {
       }
     }
 
-    // Clean any markers
-    let clean = accumulated
-      .replace(/^RESPONSE:?\s*/i, '')
-      .trim()
+    const t = accumulated.trim()
 
-    // Split on blank line (response / translation separated by empty line)
-    const parts = clean.split(/\n\s*\n/)
+    // Try --- separator
+    if (t.includes('---')) {
+      const idx = t.indexOf('---')
+      return { response: t.slice(0, idx).trim(), translation: t.slice(idx + 3).trim() }
+    }
+
+    // Try blank line
+    const parts = t.split(/\n\s*\n/)
     if (parts.length >= 2) {
-      const response = parts[0].replace(/^RESPONSE:?\s*/i, '').trim()
-      const translation = parts.slice(1).join('\n').replace(/^TRANSLATION:?\s*/i, '').trim()
-      return { response, translation }
+      return { response: parts[0].trim(), translation: parts.slice(1).join('\n').trim() }
     }
 
-    // Fallback: try markers
-    const rm = clean.match(/RESPONSE:?\s*([\s\S]*?)(?=\nTRANSLATION|$)/i)
-    const tm = clean.match(/TRANSLATION:?\s*([\s\S]*)$/i)
-    if (rm) {
-      return { response: rm[1].trim(), translation: tm ? tm[1].trim() : '' }
-    }
-
-    return { response: clean, translation: '' }
+    return { response: t, translation: '' }
   }
   async appendParagraph(sessionId: string, original: string, translation: string): Promise<Paragraph> {
     return this.request(`/api/sessions/${sessionId}`, { method: 'PATCH', body: JSON.stringify({ original, translation }) })

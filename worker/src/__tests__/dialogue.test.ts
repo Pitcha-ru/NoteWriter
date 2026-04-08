@@ -18,14 +18,14 @@ describe('dialogue', () => {
     expect(messages[1].content).toContain('Πώς σας λένε;')
   })
 
-  it('parses response separated by blank line', () => {
-    const result = parseDialogueResponse('Με λένε Αλέξανδρος.\n\nМеня зовут Александрос.')
+  it('parses response with --- separator', () => {
+    const result = parseDialogueResponse('Με λένε Αλέξανδρος.\n---\nМеня зовут Александрос.')
     expect(result.response).toBe('Με λένε Αλέξανδρος.')
     expect(result.translation).toBe('Меня зовут Александрос.')
   })
 
-  it('parses response with RESPONSE/TRANSLATION markers (fallback)', () => {
-    const result = parseDialogueResponse('RESPONSE: Με λένε Αλέξανδρος.\nTRANSLATION: Меня зовут Александрос.')
+  it('parses response separated by blank line (fallback)', () => {
+    const result = parseDialogueResponse('Με λένε Αλέξανδρος.\n\nМеня зовут Александрос.')
     expect(result.response).toBe('Με λένε Αλέξανδρος.')
     expect(result.translation).toBe('Меня зовут Александрос.')
   })
