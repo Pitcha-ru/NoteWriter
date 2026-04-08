@@ -99,7 +99,7 @@ export function initHistory(api: ApiClient, showToast: ShowToast): void {
       ? escapeHtml(session.preview.slice(0, 60)) + (session.preview.length > 60 ? '...' : '')
       : 'Empty session'
 
-    const modeBadge = session.mode === 'dialogue' ? ' · Dialogue' : session.mode === 'auto' ? ' · Auto' : ''
+    const modeBadge = session.mode === 'dialogue' ? ' · Dialogue' : ''
 
     div.innerHTML = `
       <div class="session-info">

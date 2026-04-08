@@ -2,7 +2,7 @@
 import { setPageContent, formatMenuText } from './renderer'
 import { appState } from '../services/state'
 
-const MENU_ITEMS = ['Listen', 'Auto', 'Dialogue', 'History', 'Settings']
+const MENU_ITEMS = ['Listen', 'Dialogue', 'History', 'Settings']
 
 let selectedIndex = 0
 
@@ -14,11 +14,11 @@ export function showMenu(bridge: any): void {
 
 function renderMenu(bridge: any): void {
   const items = MENU_ITEMS.map((text) => {
-    if ((text === 'Listen' || text === 'Auto') && !appState.keysConfigured) {
-      return `${text} (setup keys)`
+    if (text === 'Listen' && !appState.keysConfigured) {
+      return `${text} (setup keys first)`
     }
     if (text === 'Dialogue' && (!appState.keysConfigured || !appState.openaiKeyConfigured)) {
-      return `${text} (setup keys)`
+      return `${text} (setup keys first)`
     }
     return text
   })
@@ -29,8 +29,9 @@ export function handleMenuEvent(
   bridge: any,
   eventType: number,
   _selectedIndex: number,
-  callbacks: { onListen: () => void; onAuto: () => void; onDialogue: () => void; onHistory: () => void; onSettings: () => void }
+  callbacks: { onListen: () => void; onDialogue: () => void; onHistory: () => void; onSettings: () => void }
 ): void {
+  // SCROLL_TOP (1) = move cursor up, SCROLL_BOTTOM (2) = move cursor down, CLICK (0) = select
   if (eventType === 1) {
     selectedIndex = Math.max(0, selectedIndex - 1)
     renderMenu(bridge)
@@ -47,15 +48,12 @@ export function handleMenuEvent(
         if (appState.keysConfigured) callbacks.onListen()
         break
       case 1:
-        if (appState.keysConfigured) callbacks.onAuto()
-        break
-      case 2:
         if (appState.keysConfigured && appState.openaiKeyConfigured) callbacks.onDialogue()
         break
-      case 3:
+      case 2:
         callbacks.onHistory()
         break
-      case 4:
+      case 3:
         callbacks.onSettings()
         break
     }

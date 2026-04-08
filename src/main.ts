@@ -131,14 +131,12 @@ async function init() {
 
     switch (appState.currentScreen) {
       case 'menu': handleMenuEvent(bridge, eventType, selectedIndex, {
-        onListen: () => navigateWithGuard(() => startListening(bridge, api, 'listen')),
-        onAuto: () => navigateWithGuard(() => startListening(bridge, api, 'auto')),
+        onListen: () => navigateWithGuard(() => startListening(bridge, api)),
         onDialogue: () => navigateWithGuard(() => startDialogue(bridge, api)),
         onHistory: () => navigateWithGuard(() => showHistoryList(bridge, api)),
         onSettings: () => navigateWithGuard(() => showSettings(bridge)),
       }); break
       case 'listen': handleListenEvent(bridge, eventType, api, () => navigateWithGuard(() => showMenu(bridge))); break
-      case 'auto': handleListenEvent(bridge, eventType, api, () => navigateWithGuard(() => showMenu(bridge))); break
       case 'dialogue': handleDialogueEvent(bridge, eventType, api, () => navigateWithGuard(() => showMenu(bridge))); break
       case 'history_list': handleHistoryListEvent(bridge, eventType, selectedIndex, api, () => navigateWithGuard(() => showMenu(bridge))); break
       case 'history_detail': handleHistoryDetailEvent(bridge, eventType, api, () => navigateWithGuard(() => showHistoryList(bridge, api))); break
