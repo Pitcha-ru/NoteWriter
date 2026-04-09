@@ -42,6 +42,15 @@ export interface SessionDetailResponse {
   cursor: string | null;
 }
 
+export interface Note {
+  id: string
+  deviceId: string
+  title: string
+  content: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface MaskedKeys {
   elevenlabsKey: string | null;
   awsAccessKeyId: string | null;

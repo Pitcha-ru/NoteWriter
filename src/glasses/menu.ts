@@ -2,7 +2,7 @@
 import { setPageContent, formatMenuText } from './renderer'
 import { appState } from '../services/state'
 
-const MENU_ITEMS = ['Listen', 'Dialogue', 'History', 'Settings']
+const MENU_ITEMS = ['Listen', 'Dialogue', 'Notes', 'History', 'Settings']
 
 let selectedIndex = 0
 let menuShownAt = 0
@@ -31,7 +31,7 @@ export function handleMenuEvent(
   bridge: any,
   eventType: number,
   _selectedIndex: number,
-  callbacks: { onListen: () => void; onDialogue: () => void; onHistory: () => void; onSettings: () => void; onExit: () => void }
+  callbacks: { onListen: () => void; onDialogue: () => void; onNotes: () => void; onHistory: () => void; onSettings: () => void; onExit: () => void }
 ): void {
   // DOUBLE_CLICK (3) = shut down display
   if (eventType === 3) {
@@ -59,9 +59,12 @@ export function handleMenuEvent(
         if (appState.keysConfigured && appState.openaiKeyConfigured) callbacks.onDialogue()
         break
       case 2:
-        callbacks.onHistory()
+        callbacks.onNotes()
         break
       case 3:
+        callbacks.onHistory()
+        break
+      case 4:
         callbacks.onSettings()
         break
     }

@@ -1,4 +1,4 @@
-import type { Settings, Session, Paragraph, SessionListResponse, SessionDetailResponse, MaskedKeys, ApiKeys, DialogueMessage } from '../types'
+import type { Settings, Session, Paragraph, SessionListResponse, SessionDetailResponse, MaskedKeys, ApiKeys, DialogueMessage, Note } from '../types'
 
 // Convert snake_case keys to camelCase (recursive)
 function toCamel(obj: any): any {
@@ -160,4 +160,16 @@ export class ApiClient {
   async deleteKeys(): Promise<void> { await this.request('/api/keys', { method: 'DELETE' }) }
   async getSettings(): Promise<Settings> { return this.request('/api/settings') }
   async saveSettings(settings: Settings): Promise<void> { await this.request('/api/settings', { method: 'PUT', body: JSON.stringify(settings) }) }
+
+  async listNotes(): Promise<Note[]> { return this.request('/api/notes') }
+  async getNote(id: string): Promise<Note> { return this.request(`/api/notes/${id}`) }
+  async createNote(title: string, content: string): Promise<Note> {
+    return this.request('/api/notes', { method: 'POST', body: JSON.stringify({ title, content }) })
+  }
+  async updateNote(id: string, title: string, content: string): Promise<void> {
+    await this.request(`/api/notes/${id}`, { method: 'PUT', body: JSON.stringify({ title, content }) })
+  }
+  async deleteNote(id: string): Promise<void> {
+    await this.request(`/api/notes/${id}`, { method: 'DELETE' })
+  }
 }

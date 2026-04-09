@@ -6,6 +6,7 @@ import { translateText } from './translate'
 import { getSettings, updateSettings } from './settings'
 import { createSession, listSessions, getSession, appendParagraph, updateParagraphTranslation, deleteSession } from './sessions'
 import { buildOpenAIMessages, streamDialogueResponse } from './dialogue'
+import { listNotes, getNote, createNote, updateNote, deleteNote } from './notes'
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -165,6 +166,41 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
       })
     } catch (err) {
       return json({ error: err instanceof Error ? err.message : 'Generation failed' }, 502)
+    }
+  }
+
+  // Notes routes
+  const noteMatch = path.match(/^\/api\/notes\/([^/]+)$/)
+
+  if (path === '/api/notes') {
+    if (request.method === 'GET') {
+      const notes = await listNotes(deviceId, env.DB)
+      return json(notes)
+    }
+    if (request.method === 'POST') {
+      const body = await request.json<{ title?: string; content?: string }>()
+      const note = await createNote(deviceId, body.title ?? '', body.content ?? '', env.DB)
+      return json(note, 201)
+    }
+  }
+
+  if (noteMatch) {
+    const noteId = noteMatch[1]
+    if (request.method === 'GET') {
+      const note = await getNote(noteId, deviceId, env.DB)
+      if (!note) return json({ error: 'Note not found' }, 404)
+      return json(note)
+    }
+    if (request.method === 'PUT') {
+      const body = await request.json<{ title?: string; content?: string }>()
+      const updated = await updateNote(noteId, deviceId, body.title ?? '', body.content ?? '', env.DB)
+      if (!updated) return json({ error: 'Note not found' }, 404)
+      return json({ ok: true })
+    }
+    if (request.method === 'DELETE') {
+      const deleted = await deleteNote(noteId, deviceId, env.DB)
+      if (!deleted) return json({ error: 'Note not found' }, 404)
+      return json({ ok: true })
     }
   }
 

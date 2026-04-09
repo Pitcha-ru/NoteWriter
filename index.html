@@ -328,6 +328,101 @@
         letter-spacing: 0.3px;
         padding: 0 4px 8px;
       }
+
+      /* ── Notes ──────────────────────────────────────────────── */
+      .note-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #fff;
+        border-radius: 14px;
+        padding: 14px 16px;
+        margin-bottom: 8px;
+      }
+
+      .note-info {
+        flex: 1;
+        min-width: 0;
+        cursor: pointer;
+      }
+
+      .note-title {
+        font-size: 16px;
+        font-weight: 500;
+        color: #1a1a1a;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-bottom: 3px;
+      }
+
+      .note-preview {
+        font-size: 13px;
+        color: #999;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .note-actions {
+        display: flex;
+        gap: 6px;
+        flex-shrink: 0;
+        margin-left: 10px;
+      }
+
+      .note-action-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 18px;
+        padding: 6px;
+        color: #ccc;
+        transition: color 0.15s;
+        line-height: 1;
+      }
+
+      .note-action-btn:hover { color: #555; }
+      .note-action-btn.delete:hover { color: #d44; }
+
+      #notes-editor { display: none; }
+      #notes-list-view { display: block; }
+
+      .note-editor-title {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1.5px solid #e5e5e5;
+        border-radius: 10px;
+        font-size: 16px;
+        font-family: inherit;
+        background: #fafafa;
+        color: #1a1a1a;
+        outline: none;
+        transition: border-color 0.15s;
+        margin-bottom: 10px;
+        display: block;
+      }
+
+      .note-editor-title:focus { border-color: #1a1a1a; }
+
+      .note-editor-content {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1.5px solid #e5e5e5;
+        border-radius: 10px;
+        font-size: 15px;
+        font-family: inherit;
+        background: #fafafa;
+        color: #1a1a1a;
+        outline: none;
+        transition: border-color 0.15s;
+        resize: vertical;
+        min-height: 160px;
+        display: block;
+        margin-bottom: 12px;
+      }
+
+      .note-editor-content:focus { border-color: #1a1a1a; }
     </style>
   </head>
   <body>
@@ -336,6 +431,7 @@
     <nav class="tab-bar">
       <button class="tab-btn active" data-tab="settings">Settings</button>
       <button class="tab-btn" data-tab="history">History</button>
+      <button class="tab-btn" data-tab="notes">Notes</button>
       <button class="tab-btn" data-tab="keys">Keys</button>
     </nav>
 
@@ -403,6 +499,25 @@
             </div>
           </div>
           <button class="btn btn-secondary load-more-btn" id="detail-load-more" style="display:none">Load more</button>
+        </div>
+      </section>
+
+      <!-- Notes panel -->
+      <section id="panel-notes" class="panel">
+        <div id="notes-list-view">
+          <div id="notes-list-container">
+            <p class="empty-msg">Loading...</p>
+          </div>
+          <div style="height:10px"></div>
+          <button class="btn btn-primary" id="notes-new-btn">New Note</button>
+        </div>
+        <div id="notes-editor">
+          <div class="card">
+            <input class="note-editor-title" type="text" id="notes-editor-title" placeholder="Title" />
+            <textarea class="note-editor-content" id="notes-editor-content" placeholder="Write your note..."></textarea>
+            <button class="btn btn-primary" id="notes-editor-save" style="margin-bottom:8px">Save</button>
+            <button class="btn btn-secondary" id="notes-editor-cancel">Cancel</button>
+          </div>
         </div>
       </section>
 

@@ -1,6 +1,6 @@
 import type { Settings, Language } from '../types'
 
-export type Screen = 'menu' | 'listen' | 'history_list' | 'history_detail' | 'settings' | 'dialogue'
+export type Screen = 'menu' | 'listen' | 'history_list' | 'history_detail' | 'settings' | 'dialogue' | 'notes_list' | 'notes_detail'
 
 export class AppState {
   settings: Settings = { listenLang: 'en', translateLang: 'el', context: '', persona: '' }

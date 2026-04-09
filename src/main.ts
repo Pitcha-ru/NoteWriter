@@ -5,6 +5,7 @@ import { showMenu, handleMenuEvent } from './glasses/menu'
 import { startListening, handleListenEvent, handleAudioData, resetListen } from './glasses/listen'
 import { startDialogue, handleDialogueEvent, handleDialogueAudio, resetDialogue } from './glasses/dialogue'
 import { showHistoryList, handleHistoryListEvent, handleHistoryDetailEvent } from './glasses/history'
+import { showNotesList, handleNotesListEvent, handleNoteDetailEvent } from './glasses/notes'
 import { showSettings, handleSettingsEvent } from './glasses/settings'
 import { resetPage } from './glasses/renderer'
 
@@ -76,6 +77,13 @@ async function init() {
     }
   })
 
+  // Sync: if phone changes notes while glasses are in notes_list, refresh
+  window.addEventListener('notewriter:notes-changed', () => {
+    if (appState.currentScreen === 'notes_list') {
+      showNotesList(bridge, api)
+    }
+  })
+
   // Clean reset of all module state
   function resetAll(): void {
     resetListen()
@@ -141,6 +149,7 @@ async function init() {
       case 'menu': handleMenuEvent(bridge, eventType, selectedIndex, {
         onListen: () => navigateWithGuard(() => startListening(bridge, api)),
         onDialogue: () => navigateWithGuard(() => startDialogue(bridge, api)),
+        onNotes: () => navigateWithGuard(() => showNotesList(bridge, api)),
         onHistory: () => navigateWithGuard(() => showHistoryList(bridge, api)),
         onSettings: () => navigateWithGuard(() => showSettings(bridge)),
         onExit: () => {
@@ -152,6 +161,8 @@ async function init() {
       }); break
       case 'listen': handleListenEvent(bridge, eventType, api, () => navigateWithGuard(() => { resetAll(); showMenu(bridge) })); break
       case 'dialogue': handleDialogueEvent(bridge, eventType, api, () => navigateWithGuard(() => { resetAll(); showMenu(bridge) })); break
+      case 'notes_list': handleNotesListEvent(bridge, eventType, selectedIndex, api, () => navigateWithGuard(() => showMenu(bridge))); break
+      case 'notes_detail': handleNoteDetailEvent(bridge, eventType, api, () => navigateWithGuard(() => showNotesList(bridge, api))); break
       case 'history_list': handleHistoryListEvent(bridge, eventType, selectedIndex, api, () => navigateWithGuard(() => showMenu(bridge))); break
       case 'history_detail': handleHistoryDetailEvent(bridge, eventType, api, () => navigateWithGuard(() => showHistoryList(bridge, api))); break
       case 'settings': handleSettingsEvent(bridge, eventType, selectedIndex, api, () => navigateWithGuard(() => showMenu(bridge))); break

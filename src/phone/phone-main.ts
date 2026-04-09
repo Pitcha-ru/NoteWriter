@@ -2,6 +2,7 @@ import { ApiClient } from '../services/api'
 import { initKeys } from './keys'
 import { initHistory } from './history'
 import { initSettings } from './settings'
+import { initNotes } from './notes'
 
 const WORKER_URL = 'https://notewriter-worker.kiwibudka.workers.dev'
 
@@ -49,6 +50,7 @@ function initTabs(): void {
   initKeys(api, showToast)
   initHistory(api, showToast)
   initSettings(api, showToast)
+  initNotes(api, showToast)
   initStartStop()
 }
 
