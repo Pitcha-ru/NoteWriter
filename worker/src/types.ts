@@ -4,6 +4,7 @@ export interface Env {
   ENCRYPTION_KEY: string;
   ELEVENLABS_API_BASE: string;
   AWS_TRANSLATE_ENDPOINT: string;
+  ADMIN_PASSWORD: string;
 }
 
 export interface AuthenticatedRequest extends Request {

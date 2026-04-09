@@ -172,4 +172,8 @@ export class ApiClient {
   async deleteNote(id: string): Promise<void> {
     await this.request(`/api/notes/${id}`, { method: 'DELETE' })
   }
+
+  async hideNote(id: string): Promise<void> {
+    await this.request(`/api/notes/${id}/hide`, { method: 'POST' })
+  }
 }

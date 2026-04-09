@@ -49,6 +49,8 @@ export interface Note {
   content: string
   createdAt: string
   updatedAt: string
+  type?: 'personal' | 'group'
+  groupName?: string
 }
 
 export interface MaskedKeys {

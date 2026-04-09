@@ -60,34 +60,42 @@ export function initNotes(api: ApiClient, showToast: ShowToast): void {
   function renderNoteItem(note: Note): HTMLElement {
     const div = document.createElement('div')
     div.className = 'note-item'
+    const isGroup = note.type === 'group'
 
     const title = note.title || '(untitled)'
     const preview = note.content
       ? note.content.slice(0, 60) + (note.content.length > 60 ? '...' : '')
       : '(empty)'
 
+    const groupBadge = isGroup && note.groupName
+      ? `<span class="note-group-badge">${escapeHtml(note.groupName)}</span>`
+      : ''
+
     div.innerHTML = `
       <div class="note-info">
-        <div class="note-title">${escapeHtml(title)}</div>
+        <div class="note-title">${groupBadge}${escapeHtml(title)}</div>
         <div class="note-preview">${escapeHtml(preview)}</div>
       </div>
       <div class="note-actions">
-        <button class="note-action-btn edit" aria-label="Edit note" title="Edit">&#9998;</button>
-        <button class="note-action-btn delete" aria-label="Delete note" title="Delete">&#128465;</button>
+        ${isGroup ? '' : '<button class="note-action-btn edit" aria-label="Edit note" title="Edit">&#9998;</button>'}
+        <button class="note-action-btn delete" aria-label="${isGroup ? 'Hide note' : 'Delete note'}" title="${isGroup ? 'Hide' : 'Delete'}">&#128465;</button>
       </div>
     `
 
     const infoEl = div.querySelector<HTMLDivElement>('.note-info')!
-    infoEl.addEventListener('click', () => showEditor(note))
+    if (!isGroup) {
+      infoEl.addEventListener('click', () => showEditor(note))
 
-    const editBtn = div.querySelector<HTMLButtonElement>('.note-action-btn.edit')!
-    editBtn.addEventListener('click', () => showEditor(note))
+      const editBtn = div.querySelector<HTMLButtonElement>('.note-action-btn.edit')
+      if (editBtn) editBtn.addEventListener('click', () => showEditor(note))
+    }
 
     const deleteBtn = div.querySelector<HTMLButtonElement>('.note-action-btn.delete')!
     deleteBtn.addEventListener('click', () => {
-      api.deleteNote(note.id).then(() => {
+      const action = isGroup ? api.hideNote(note.id) : api.deleteNote(note.id)
+      action.then(() => {
         div.remove()
-        showToast('Note deleted')
+        showToast(isGroup ? 'Note hidden' : 'Note deleted')
         window.dispatchEvent(new CustomEvent('notewriter:notes-changed'))
       }).catch((err: unknown) => {
         showToast(err instanceof Error ? err.message : 'Failed to delete note.', true)

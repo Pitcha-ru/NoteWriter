@@ -7,6 +7,7 @@ import { getSettings, updateSettings } from './settings'
 import { createSession, listSessions, getSession, appendParagraph, updateParagraphTranslation, deleteSession } from './sessions'
 import { buildOpenAIMessages, streamDialogueResponse } from './dialogue'
 import { listNotes, getNote, createNote, updateNote, deleteNote } from './notes'
+import { handleAdminRequest } from './admin'
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -26,6 +27,15 @@ export default {
           'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         },
       })
+    }
+
+    // Admin routes (have their own auth)
+    if (path.startsWith('/admin')) {
+      const adminResponse = await handleAdminRequest(request, env, path)
+      if (adminResponse) {
+        adminResponse.headers.set('Access-Control-Allow-Origin', '*')
+        return adminResponse
+      }
     }
 
     const response = await handleRequest(request, env, path, url)
@@ -167,6 +177,14 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
     } catch (err) {
       return json({ error: err instanceof Error ? err.message : 'Generation failed' }, 502)
     }
+  }
+
+  // Hide group note route
+  const hideMatch = path.match(/^\/api\/notes\/([^/]+)\/hide$/)
+  if (hideMatch && request.method === 'POST') {
+    const noteId = hideMatch[1]
+    await env.DB.prepare('INSERT OR IGNORE INTO hidden_group_notes (device_id, note_id) VALUES (?, ?)').bind(deviceId, noteId).run()
+    return json({ ok: true })
   }
 
   // Notes routes

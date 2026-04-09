@@ -7,11 +7,33 @@ export interface Note {
   updated_at: string
 }
 
-export async function listNotes(deviceId: string, db: D1Database): Promise<Note[]> {
-  const result = await db.prepare(
-    'SELECT * FROM notes WHERE device_id = ? ORDER BY updated_at DESC'
-  ).bind(deviceId).all<Note>()
-  return result.results
+export async function listNotes(deviceId: string, db: D1Database): Promise<any[]> {
+  // Personal notes
+  const personal = await db.prepare(
+    'SELECT id, device_id, title, content, created_at, updated_at FROM notes WHERE device_id = ? ORDER BY updated_at DESC'
+  ).bind(deviceId).all()
+
+  // Group notes (for groups this device belongs to, excluding hidden)
+  const groupNotes = await db.prepare(`
+    SELECT gn.id, gn.title, gn.content, gn.created_at, g.name as group_name
+    FROM group_notes gn
+    JOIN groups g ON g.id = gn.group_id
+    JOIN group_devices gd ON gd.group_id = gn.group_id
+    WHERE gd.device_id = ?
+    AND gn.id NOT IN (SELECT note_id FROM hidden_group_notes WHERE device_id = ?)
+    ORDER BY gn.created_at DESC
+  `).bind(deviceId, deviceId).all()
+
+  // Merge: add a 'type' field to distinguish
+  const personalWithType = personal.results.map((n: any) => ({ ...n, type: 'personal' }))
+  const groupWithType = groupNotes.results.map((n: any) => ({
+    ...n,
+    device_id: deviceId,
+    updated_at: n.created_at,
+    type: 'group',
+  }))
+
+  return [...personalWithType, ...groupWithType]
 }
 
 export async function getNote(noteId: string, deviceId: string, db: D1Database): Promise<Note | null> {
