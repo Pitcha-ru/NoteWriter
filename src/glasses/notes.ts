@@ -1,5 +1,5 @@
 // src/glasses/notes.ts
-import { setPageContent, updateText, formatHistoryDetail } from './renderer'
+import { setPageContent, updateText } from './renderer'
 import { appState } from '../services/state'
 import { ApiClient } from '../services/api'
 import type { Note } from '../types'
@@ -10,7 +10,6 @@ let notes: Note[] = []
 let listCursorIndex = 0
 let currentNote: Note | null = null
 let currentContentIndex = 0
-let lastShownLines = 1
 
 // ── Notes list (with cursor navigation) ──────────────────────────────────────
 
@@ -77,47 +76,47 @@ export function handleNotesListEvent(
 
 // ── Note detail (scroll through content) ────────────────────────────────────
 
-function noteToFakeParagraphs(note: Note): Array<{ original: string; translation: string }> {
-  // Break content into ~paragraph-sized chunks for pagination
-  const lines = note.content.split('\n')
-  const chunks: Array<{ original: string; translation: string }> = []
-  let current: string[] = []
+// Max chars per page (~8 lines * ~38 chars, minus 1 line for title)
+const PAGE_CHARS = 260
 
-  for (const line of lines) {
-    current.push(line)
-    if (current.length >= 3 || (current.length > 0 && line === '')) {
-      const text = current.join('\n').trim()
-      if (text) chunks.push({ original: text, translation: '' })
-      current = []
+function noteToPages(note: Note): string[] {
+  const fullText = note.content.trim()
+  if (!fullText) return ['(empty)']
+
+  // Split into words, build pages that fit on screen
+  const words = fullText.split(/\s+/)
+  const pages: string[] = []
+  let current = ''
+
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word
+    if (candidate.length > PAGE_CHARS && current) {
+      pages.push(current)
+      current = word
+    } else {
+      current = candidate
     }
   }
-  if (current.length > 0) {
-    const text = current.join('\n').trim()
-    if (text) chunks.push({ original: text, translation: '' })
-  }
+  if (current) pages.push(current)
 
-  if (chunks.length === 0) {
-    chunks.push({ original: '(empty)', translation: '' })
-  }
-  return chunks
+  return pages.length > 0 ? pages : ['(empty)']
 }
 
-let noteChunks: Array<{ original: string; translation: string }> = []
+let notePages: string[] = []
 
 function renderNoteDetail(bridge: any): void {
   if (!currentNote) return
-  const { text, shown } = formatHistoryDetail(noteChunks, currentContentIndex)
-  lastShownLines = Math.max(shown, 1)
-  const endIdx = Math.min(currentContentIndex + lastShownLines, noteChunks.length)
-  const indicator = `${currentNote.title || '(untitled)'} ${currentContentIndex + 1}-${endIdx}/${noteChunks.length}`
-  updateText(bridge, DISPLAY_ID, `${indicator}\n${text}`)
+  const title = currentNote.title || '(untitled)'
+  const page = notePages[currentContentIndex] || ''
+  const indicator = notePages.length > 1 ? ` ${currentContentIndex + 1}/${notePages.length}` : ''
+  updateText(bridge, DISPLAY_ID, `${title}${indicator}\n${page}`)
 }
 
 export async function showNoteDetail(bridge: any, api: ApiClient, noteIndex: number): Promise<void> {
   appState.navigateTo('notes_detail')
   currentNote = null
   currentContentIndex = 0
-  noteChunks = []
+  notePages = []
 
   const note = notes[noteIndex]
   if (!note) {
@@ -130,7 +129,7 @@ export async function showNoteDetail(bridge: any, api: ApiClient, noteIndex: num
   try {
     const fullNote = await api.getNote(note.id)
     currentNote = fullNote
-    noteChunks = noteToFakeParagraphs(fullNote)
+    notePages = noteToPages(fullNote)
     renderNoteDetail(bridge)
   } catch {
     updateText(bridge, DISPLAY_ID, 'Failed to load note.\nDouble-click to go back.')
@@ -149,13 +148,13 @@ export function handleNoteDetailEvent(
       break
     case 1: // UP — previous page
       if (currentContentIndex > 0) {
-        currentContentIndex = Math.max(0, currentContentIndex - lastShownLines)
+        currentContentIndex--
         renderNoteDetail(bridge)
       }
       break
     case 2: // DOWN — next page
-      if (currentContentIndex + lastShownLines < noteChunks.length) {
-        currentContentIndex += lastShownLines
+      if (currentContentIndex < notePages.length - 1) {
+        currentContentIndex++
         renderNoteDetail(bridge)
       }
       break

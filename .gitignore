@@ -3,3 +3,4 @@ dist/
 .wrangler/
 *.ehpk
 .DS_Store
+glasses_*.png
