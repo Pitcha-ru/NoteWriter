@@ -138,25 +138,31 @@ async function startAudio(api: ApiClient): Promise<void> {
       committedPairs.push({ original: chunk, translation: '' })
       updateDisplay()
 
-      enqueueSave(async () => {
-        const sessionId = appState.currentSessionId
-        let paraId: string | null = null
-        if (sessionId) {
-          try {
-            const p = await api.appendParagraph(sessionId, chunk, '')
-            paraId = p.id
-            window.dispatchEvent(new CustomEvent('notewriter:session-updated'))
-          } catch {}
-        }
-        try {
-          const translated = await api.translate(chunk, appState.settings.listenLang, appState.settings.translateLang)
+      const saveP = new Promise<string | null>((resolve) => {
+        enqueueSave(async () => {
+          const sessionId = appState.currentSessionId
+          if (sessionId) {
+            try {
+              const p = await api.appendParagraph(sessionId, chunk, '')
+              window.dispatchEvent(new CustomEvent('notewriter:session-updated'))
+              resolve(p.id)
+              return
+            } catch {}
+          }
+          resolve(null)
+        })
+      })
+
+      api.translate(chunk, appState.settings.listenLang, appState.settings.translateLang)
+        .then(async (translated) => {
           if (translated) {
             committedPairs[idx].translation = translated
             updateDisplay()
+            const paraId = await saveP
             if (paraId) api.updateParagraphTranslation(paraId, translated).catch(() => {})
           }
-        } catch {}
-      })
+        })
+        .catch(() => {})
     }
   })
 

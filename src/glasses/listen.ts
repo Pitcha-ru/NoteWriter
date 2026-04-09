@@ -147,24 +147,30 @@ async function resumeListening(): Promise<void> {
         committedPairs.push({ original: chunk, translation: '' })
         updateDisplay()
 
-        enqueueSave(async () => {
-          const sessionId = appState.currentSessionId
-          let paraId: string | null = null
-          if (sessionId) {
-            try {
-              const p = await currentApi!.appendParagraph(sessionId, chunk, '')
-              paraId = p.id
-            } catch {}
-          }
-          try {
-            const translated = await currentApi!.translate(chunk, appState.settings.listenLang, appState.settings.translateLang)
+        const saveP = new Promise<string | null>((resolve) => {
+          enqueueSave(async () => {
+            const sessionId = appState.currentSessionId
+            if (sessionId) {
+              try {
+                const p = await currentApi!.appendParagraph(sessionId, chunk, '')
+                resolve(p.id)
+                return
+              } catch {}
+            }
+            resolve(null)
+          })
+        })
+
+        currentApi!.translate(chunk, appState.settings.listenLang, appState.settings.translateLang)
+          .then(async (translated) => {
             if (translated) {
               committedPairs[idx].translation = translated
               updateDisplay()
+              const paraId = await saveP
               if (paraId) currentApi!.updateParagraphTranslation(paraId, translated).catch(() => {})
             }
-          } catch {}
-        })
+          })
+          .catch(() => {})
       }
     })
 
@@ -239,26 +245,33 @@ export async function startListening(bridge: any, api: ApiClient): Promise<void>
         committedPairs.push({ original: chunk, translation: '' })
         updateDisplay()
 
-        // Save sequentially (queue ensures correct order), translate in parallel
-        enqueueSave(async () => {
-          const sessionId = appState.currentSessionId
-          let paraId: string | null = null
-          if (sessionId) {
-            try {
-              const p = await api.appendParagraph(sessionId, chunk, '')
-              paraId = p.id
-              window.dispatchEvent(new CustomEvent('notewriter:session-updated'))
-            } catch {}
-          }
-          try {
-            const translated = await api.translate(chunk, sourceLang, targetLang)
+        // Save sequentially (queue ensures correct order)
+        const savePromise = new Promise<string | null>((resolve) => {
+          enqueueSave(async () => {
+            const sessionId = appState.currentSessionId
+            if (sessionId) {
+              try {
+                const p = await api.appendParagraph(sessionId, chunk, '')
+                window.dispatchEvent(new CustomEvent('notewriter:session-updated'))
+                resolve(p.id)
+                return
+              } catch {}
+            }
+            resolve(null)
+          })
+        })
+
+        // Translate in parallel (don't wait in queue)
+        api.translate(chunk, sourceLang, targetLang)
+          .then(async (translated) => {
             if (translated) {
               committedPairs[idx].translation = translated
               updateDisplay()
+              const paraId = await savePromise
               if (paraId) api.updateParagraphTranslation(paraId, translated).catch(() => {})
             }
-          } catch {}
-        })
+          })
+          .catch(() => {})
       }
     })
 
