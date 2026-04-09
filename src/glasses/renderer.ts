@@ -48,6 +48,76 @@ export function setPageContent(bridge: any, content: string): void {
 }
 
 /**
+ * Switch to split-screen layout: top half for transcript, bottom half for translation.
+ * Uses rebuildPageContainer with two text containers.
+ */
+export function setSplitLayout(bridge: any, topText: string, bottomText: string): void {
+  const topProp = new TextContainerProperty({
+    containerID: 0,
+    content: topText,
+    isEventCapture: 1,
+    width: 576,
+    height: 140,
+    xPosition: 0,
+    yPosition: 0,
+  })
+  const bottomProp = new TextContainerProperty({
+    containerID: 1,
+    content: bottomText,
+    isEventCapture: 0,
+    width: 576,
+    height: 140,
+    xPosition: 0,
+    yPosition: 148,
+  })
+
+  if (!pageCreated) {
+    pageCreated = true
+    bridge.createStartUpPageContainer(
+      new CreateStartUpPageContainer({
+        containerTotalNum: 2,
+        textObject: [topProp, bottomProp],
+      })
+    )
+  } else {
+    bridge.rebuildPageContainer(
+      new RebuildPageContainer({
+        containerTotalNum: 2,
+        textObject: [topProp, bottomProp],
+      })
+    )
+  }
+}
+
+/** Update just the top container (ID 0) — for transcript */
+export function updateTop(bridge: any, text: string): void {
+  if (!bridge) return
+  const content = fitToLines(text, HALF_DISPLAY_LINES)
+  bridge.textContainerUpgrade(new TextContainerUpgrade({ containerID: 0, content }))
+}
+
+/** Update just the bottom container (ID 1) — for translation */
+export function updateBottom(bridge: any, text: string): void {
+  if (!bridge) return
+  const content = fitToLines(text, HALF_DISPLAY_LINES)
+  bridge.textContainerUpgrade(new TextContainerUpgrade({ containerID: 1, content }))
+}
+
+/** Fit text to N lines, keeping newest (bottom) lines */
+function fitToLines(text: string, maxLines: number): string {
+  const lines = text.split('\n')
+  const fitted: string[] = []
+  let usedLines = 0
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const lc = Math.max(1, Math.ceil(lines[i].length / CHARS_PER_LINE))
+    if (usedLines + lc > maxLines) break
+    fitted.unshift(lines[i])
+    usedLines += lc
+  }
+  return fitted.join('\n')
+}
+
+/**
  * Incrementally update the text of a container that has already been created.
  * Truncates content to fit on screen to prevent native scroll.
  */
@@ -77,6 +147,7 @@ export function updateText(bridge: any, containerId: number, text: string): void
 
 // Approximate max lines that fit on 576x288 display without scroll
 const MAX_DISPLAY_LINES = 9
+const HALF_DISPLAY_LINES = 4
 // Approximate chars per line on the display
 const CHARS_PER_LINE = 38
 

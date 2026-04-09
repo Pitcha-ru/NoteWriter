@@ -1,5 +1,5 @@
 // src/glasses/listen.ts
-import { setPageContent, updateText, formatListenDisplay } from './renderer'
+import { setPageContent, updateText, formatListenDisplay, setSplitLayout, updateTop, updateBottom } from './renderer'
 import { appState } from '../services/state'
 import { SttClient } from '../services/stt'
 import { ApiClient } from '../services/api'
@@ -71,32 +71,37 @@ function isNoise(text: string): boolean {
   return false
 }
 
-function buildDisplayText(): string {
-  if (listenState === 'paused') {
-    let text = '|| PAUSED\nClick = resume\nDouble-click = exit'
-    if (committedPairs.length > 0) {
-      const last = committedPairs[committedPairs.length - 1]
-      text += `\n\n${last.original.slice(0, 60)}`
-      if (last.translation && !last.translation.startsWith('[ERR')) {
-        text += `\n${last.translation.slice(0, 60)}`
-      }
-    }
-    return text
-  }
-
-  // Blinking dot indicator
+function buildTranscriptText(): string {
   const dot = indicatorFrame % 2 === 0 ? '*' : ' '
+  const originals = committedPairs.map(p => p.original)
+  if (partialText) originals.push(`${dot} ${partialText}`)
+  else if (originals.length === 0) originals.push(`${dot} Speak now...`)
+  return originals.join('\n')
+}
 
-  if (committedPairs.length === 0 && !partialText) {
-    return `${dot} Speak now...`
-  }
-
-  return formatListenDisplay(committedPairs, partialText, dot)
+function buildTranslationText(): string {
+  const translations = committedPairs
+    .map(p => p.translation)
+    .filter(t => t && !t.startsWith('[ERR'))
+  return translations.join('\n') || ''
 }
 
 function updateDisplay(): void {
   if (!currentBridge) return
-  updateText(currentBridge, DISPLAY_ID, buildDisplayText())
+  if (listenState === 'paused') {
+    // Paused — use single-container display
+    let text = '|| PAUSED\nClick = resume\nDouble-click = exit'
+    if (committedPairs.length > 0) {
+      const last = committedPairs[committedPairs.length - 1]
+      text += `\n\n${last.original.slice(0, 60)}`
+      if (last.translation) text += `\n${last.translation.slice(0, 60)}`
+    }
+    setPageContent(currentBridge, text)
+    return
+  }
+  // Active — split screen: top=transcript, bottom=translation
+  updateTop(currentBridge, buildTranscriptText())
+  updateBottom(currentBridge, buildTranslationText())
 }
 
 function startIndicator(): void {
@@ -127,7 +132,7 @@ async function resumeListening(): Promise<void> {
   partialText = ''
   sttStatus = ''
 
-  updateText(currentBridge, DISPLAY_ID, 'Resuming...')
+  setSplitLayout(currentBridge, 'Resuming...', '')
 
   try {
     const { token } = await currentApi.getSttToken()
@@ -212,7 +217,7 @@ export async function startListening(bridge: any, api: ApiClient): Promise<void>
   currentApi = api
   resetListenState()
 
-  setPageContent(bridge, 'Connecting...')
+  setSplitLayout(bridge, 'Connecting...', '')
 
   try {
     const session = await api.createSession(
