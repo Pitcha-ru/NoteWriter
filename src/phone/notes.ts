@@ -52,8 +52,8 @@ export function initNotes(api: ApiClient, showToast: ShowToast): void {
     })
   })
 
-  // Sync: reload when notes change (from glasses or other events)
-  window.addEventListener('notewriter:notes-changed', () => void loadNotes())
+  // Sync: reload when notes change from glasses side
+  // (phone-initiated changes already call loadNotes directly)
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -129,9 +129,10 @@ export function initNotes(api: ApiClient, showToast: ShowToast): void {
 
     doSave.then(() => {
       showToast(editingNoteId ? 'Note saved' : 'Note created')
-      window.dispatchEvent(new CustomEvent('notewriter:notes-changed'))
       showList()
       void loadNotes()
+      // Notify glasses (don't trigger our own reload — loadNotes already called above)
+      window.dispatchEvent(new CustomEvent('notewriter:notes-changed'))
     }).catch((err: unknown) => {
       showToast(err instanceof Error ? err.message : 'Failed to save note.', true)
     })

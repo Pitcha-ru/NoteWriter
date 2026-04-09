@@ -46,7 +46,10 @@ function trySetToken(): boolean {
   return false
 }
 
+let tabsInitialized = false
 function initTabs(): void {
+  if (tabsInitialized) return
+  tabsInitialized = true
   initKeys(api, showToast)
   initHistory(api, showToast)
   initSettings(api, showToast)
