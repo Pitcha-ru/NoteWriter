@@ -52,14 +52,15 @@ export function setPageContent(bridge: any, content: string): void {
  * Truncates content to fit on screen to prevent native scroll.
  */
 export function updateText(bridge: any, containerId: number, text: string): void {
-  // Limit to MAX_DISPLAY_LINES to prevent native scroll
+  // Keep the LAST lines that fit on screen (newest content visible)
   const lines = text.split('\n')
   const fitted: string[] = []
   let usedLines = 0
-  for (const line of lines) {
-    const lineCount = Math.max(1, Math.ceil(line.length / CHARS_PER_LINE))
+  // Build from bottom up — keep newest lines
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const lineCount = Math.max(1, Math.ceil(lines[i].length / CHARS_PER_LINE))
     if (usedLines + lineCount > MAX_DISPLAY_LINES) break
-    fitted.push(line)
+    fitted.unshift(lines[i])
     usedLines += lineCount
   }
   const content = fitted.join('\n')
