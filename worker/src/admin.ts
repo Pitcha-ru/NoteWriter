@@ -336,7 +336,7 @@ function adminHtml(): string {
         const li = document.createElement('li');
         if (g.id === selectedGroupId) li.classList.add('active');
         li.innerHTML = '<span class="name">' + esc(g.name) + '</span><button class="del-group" title="Delete group">&times;</button>';
-        li.querySelector('.name').onclick = () => selectGroup(g.id);
+        li.onclick = () => selectGroup(g.id);
         li.querySelector('.del-group').onclick = async (e) => {
           e.stopPropagation();
           if (!confirm('Delete group "' + g.name + '"?')) return;
