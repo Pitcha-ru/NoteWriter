@@ -171,9 +171,37 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
         const err = await streamResponse.text()
         return json({ error: `OpenAI error (${streamResponse.status}): ${err.slice(0, 200)}` }, 502)
       }
-      return new Response(streamResponse.body, {
-        headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' },
-      })
+
+      // Read full SSE stream on Worker side and return parsed result
+      // (WebView on real device may not support ReadableStream)
+      const reader = streamResponse.body!.getReader()
+      const decoder = new TextDecoder()
+      let accumulated = ''
+      let buffer = ''
+
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed.startsWith('data:')) continue
+          const data = trimmed.slice(5).trim()
+          if (data === '[DONE]') break
+          try {
+            const parsed = JSON.parse(data)
+            const content = parsed.choices?.[0]?.delta?.content
+            if (content) accumulated += content
+          } catch {}
+        }
+      }
+
+      // Parse response/translation
+      const { parseDialogueResponse } = await import('./dialogue')
+      const parsed = parseDialogueResponse(accumulated)
+      return json(parsed)
     } catch (err) {
       return json({ error: err instanceof Error ? err.message : 'Generation failed' }, 502)
     }
