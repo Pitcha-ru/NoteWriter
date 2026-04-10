@@ -33,7 +33,14 @@ export async function listNotes(deviceId: string, db: D1Database): Promise<any[]
     type: 'group',
   }))
 
-  return [...personalWithType, ...groupWithType]
+  // Merge and sort by date (newest first)
+  const all = [...personalWithType, ...groupWithType]
+  all.sort((a: any, b: any) => {
+    const dateA = a.updated_at || a.created_at || ''
+    const dateB = b.updated_at || b.created_at || ''
+    return dateB.localeCompare(dateA)
+  })
+  return all
 }
 
 export async function getNote(noteId: string, deviceId: string, db: D1Database): Promise<Note | null> {
