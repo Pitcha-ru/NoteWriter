@@ -79,6 +79,11 @@ async function handleAdminApi(request: Request, env: Env, path: string): Promise
   const groupMatch = path.match(/^\/admin\/api\/groups\/([^/]+)$/)
   if (groupMatch) {
     const groupId = groupMatch[1]
+    if (request.method === 'PUT') {
+      const body = await request.json<{ name: string }>()
+      await db.prepare('UPDATE groups SET name = ? WHERE id = ?').bind(body.name, groupId).run()
+      return json({ ok: true })
+    }
     if (request.method === 'DELETE') {
       await db.prepare('DELETE FROM groups WHERE id = ?').bind(groupId).run()
       return json({ ok: true })
@@ -245,7 +250,7 @@ function adminHtml(): string {
         <h3>Devices</h3>
         <div id="device-tags"></div>
         <div class="add-row">
-          <select id="device-select"><option value="">Add device...</option></select>
+          <input type="text" id="device-input" placeholder="Enter device ID...">
           <button id="add-device-btn" class="btn btn-sm">Add</button>
         </div>
       </div>
@@ -376,6 +381,13 @@ function adminHtml(): string {
   }
 
   async function loadGroupDetail(id) {
+    // Load group info (find name from sidebar)
+    try {
+      const groups = await api('/admin/api/groups');
+      const group = groups.find(g => g.id === id);
+      if (group) $('#group-name').value = group.name;
+    } catch {}
+
     // Load devices
     try {
       const devices = await api('/admin/api/groups/' + id + '/devices');
@@ -407,23 +419,14 @@ function adminHtml(): string {
       container.innerHTML = '<span class="empty">No devices</span>';
     }
 
-    // Populate dropdown
-    const sel = $('#device-select');
-    sel.innerHTML = '<option value="">Add device...</option>';
-    allDevices.forEach(d => {
-      if (!groupDevices.includes(d.device_id)) {
-        const opt = document.createElement('option');
-        opt.value = d.device_id;
-        opt.textContent = d.device_id.slice(0, 20) + (d.device_id.length > 20 ? '...' : '');
-        sel.appendChild(opt);
-      }
-    });
   }
 
   $('#add-device-btn').onclick = async () => {
-    const did = $('#device-select').value;
+    const input = $('#device-input');
+    const did = input.value.trim();
     if (!did) return;
     await api('/admin/api/groups/' + selectedGroupId + '/devices', { method: 'POST', body: JSON.stringify({ device_id: did }) });
+    input.value = '';
     await loadGroupDetail(selectedGroupId);
   };
 
@@ -482,13 +485,17 @@ function adminHtml(): string {
     await loadGroupDetail(selectedGroupId);
   };
 
-  // Update group name on blur
+  // Auto-save group name on change
   let nameTimeout = null;
   $('#group-name').addEventListener('input', () => {
     clearTimeout(nameTimeout);
     nameTimeout = setTimeout(async () => {
-      // No dedicated rename endpoint — just a UX placeholder; groups are named at creation
-    }, 500);
+      if (!selectedGroupId) return;
+      const name = $('#group-name').value.trim();
+      if (!name) return;
+      await api('/admin/api/groups/' + selectedGroupId, { method: 'PUT', body: JSON.stringify({ name }) });
+      loadGroups();
+    }, 800);
   });
 
   function esc(s) {
