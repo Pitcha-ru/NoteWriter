@@ -44,8 +44,19 @@ export async function listNotes(deviceId: string, db: D1Database): Promise<any[]
 }
 
 export async function getNote(noteId: string, deviceId: string, db: D1Database): Promise<Note | null> {
-  return db.prepare('SELECT * FROM notes WHERE id = ? AND device_id = ?')
+  // Try personal notes first
+  const personal = await db.prepare('SELECT * FROM notes WHERE id = ? AND device_id = ?')
     .bind(noteId, deviceId).first<Note>()
+  if (personal) return personal
+
+  // Try group notes (verify device is in the group)
+  const groupNote = await db.prepare(`
+    SELECT gn.id, gn.title, gn.content, gn.created_at, gn.created_at as updated_at
+    FROM group_notes gn
+    JOIN group_devices gd ON gd.group_id = gn.group_id
+    WHERE gn.id = ? AND gd.device_id = ?
+  `).bind(noteId, deviceId).first<Note>()
+  return groupNote ?? null
 }
 
 export async function createNote(deviceId: string, title: string, content: string, db: D1Database): Promise<Note> {
