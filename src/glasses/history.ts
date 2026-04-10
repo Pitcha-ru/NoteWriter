@@ -20,6 +20,8 @@ function formatDateShort(dateStr: string | undefined): string {
 
 let sessions: Session[] = []
 let listCursorIndex = 0
+let listScrollOffset = 0  // first visible item index
+const VISIBLE_ITEMS = 7   // how many session items fit on screen
 let paragraphs: Paragraph[] = []
 let currentParagraphIndex = 0
 
@@ -31,19 +33,28 @@ function renderHistoryList(bridge: any): void {
     return
   }
 
-  const lines = sessions.map((s, i) => {
-    const cursor = i === listCursorIndex ? '> ' : '  '
+  // Keep cursor within visible window
+  if (listCursorIndex < listScrollOffset) listScrollOffset = listCursorIndex
+  if (listCursorIndex >= listScrollOffset + VISIBLE_ITEMS) listScrollOffset = listCursorIndex - VISIBLE_ITEMS + 1
+
+  const visible = sessions.slice(listScrollOffset, listScrollOffset + VISIBLE_ITEMS)
+  const lines = visible.map((s, i) => {
+    const globalIdx = listScrollOffset + i
+    const cursor = globalIdx === listCursorIndex ? '> ' : '  '
     const dateStr = formatDateShort(s.createdAt)
     const preview = s.preview ? s.preview.slice(0, 35) : '(empty)'
     return `${cursor}${dateStr} ${preview}`
   })
-  updateText(bridge, DISPLAY_ID, lines.join('\n'))
+  // Show scroll indicator if more items exist
+  const indicator = `${listCursorIndex + 1}/${sessions.length}`
+  updateText(bridge, DISPLAY_ID, `${indicator}\n${lines.join('\n')}`)
 }
 
 export async function showHistoryList(bridge: any, api: ApiClient): Promise<void> {
   appState.navigateTo('history_list')
   sessions = []
   listCursorIndex = 0
+  listScrollOffset = 0
 
   setPageContent(bridge, 'Loading...')
 

@@ -8,6 +8,8 @@ const DISPLAY_ID = 0
 
 let notes: Note[] = []
 let listCursorIndex = 0
+let listScrollOffset = 0
+const VISIBLE_ITEMS = 8
 let currentNote: Note | null = null
 let currentContentIndex = 0
 
@@ -19,18 +21,25 @@ function renderNotesList(bridge: any): void {
     return
   }
 
-  const lines = notes.map((n, i) => {
-    const cursor = i === listCursorIndex ? '> ' : '  '
+  if (listCursorIndex < listScrollOffset) listScrollOffset = listCursorIndex
+  if (listCursorIndex >= listScrollOffset + VISIBLE_ITEMS) listScrollOffset = listCursorIndex - VISIBLE_ITEMS + 1
+
+  const visible = notes.slice(listScrollOffset, listScrollOffset + VISIBLE_ITEMS)
+  const lines = visible.map((n, i) => {
+    const globalIdx = listScrollOffset + i
+    const cursor = globalIdx === listCursorIndex ? '> ' : '  '
     const title = n.title || '(untitled)'
     return `${cursor}${title}`
   })
-  updateText(bridge, DISPLAY_ID, lines.join('\n'))
+  const indicator = notes.length > VISIBLE_ITEMS ? `${listCursorIndex + 1}/${notes.length}\n` : ''
+  updateText(bridge, DISPLAY_ID, `${indicator}${lines.join('\n')}`)
 }
 
 export async function showNotesList(bridge: any, api: ApiClient): Promise<void> {
   appState.navigateTo('notes_list')
   notes = []
   listCursorIndex = 0
+  listScrollOffset = 0
 
   setPageContent(bridge, 'Loading...')
 
