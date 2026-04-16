@@ -1,3 +1,5 @@
+import { log } from './logger'
+
 export interface SttConfig { language: string }
 type TranscriptCallback = (text: string) => void
 type StatusCallback = (status: string) => void
@@ -57,6 +59,7 @@ export class SttClient {
     this.ws.onopen = () => {
       this.reconnectAttempts = 0
       this.emitStatus('WS open')
+      log('STT', 'WebSocket connected')
     }
 
     this.ws.onmessage = (event) => {
@@ -66,14 +69,17 @@ export class SttClient {
 
     this.ws.onerror = () => {
       this.emitStatus('WS error')
+      log('ERR', 'STT WebSocket error')
       this.errorCallbacks.forEach(cb => cb(new Error('WebSocket error')))
     }
 
     this.ws.onclose = (e) => {
       this.emitStatus(`Closed:${e.code}`)
+      log('STT', `WebSocket closed: ${e.code}`)
       if (this.shouldReconnect && this.reconnectAttempts < this.maxReconnectAttempts) {
         const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 10000)
         this.reconnectAttempts++
+        log('STT', `Reconnecting (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
         setTimeout(() => this.connect(), delay)
       }
     }
@@ -121,27 +127,33 @@ export class SttClient {
 
       if (type === 'session_started') {
         this.emitStatus('Session OK')
+        log('STT', 'Session started')
         return
       }
 
       if (type === 'partial_transcript' && msg.text) {
+        log('STT', `Partial transcript (len=${msg.text.length})`)
         this.partialCallbacks.forEach(cb => cb(msg.text))
         return
       }
 
       if ((type === 'committed_transcript' || type === 'committed_transcript_with_timestamps') && msg.text) {
+        log('STT', `Committed: "${msg.text.slice(0, 80)}" (len=${msg.text.length})`)
         this.committedCallbacks.forEach(cb => cb(msg.text))
         return
       }
 
       if (type === 'error') {
-        this.emitStatus(`STT err: ${msg.message ?? JSON.stringify(msg)}`)
+        const errMsg = msg.message ?? JSON.stringify(msg)
+        this.emitStatus(`STT err: ${errMsg}`)
+        log('ERR', `STT error: ${errMsg}`)
         return
       }
 
       this.emitStatus(`STT: ${type}`)
     } catch {
       this.emitStatus(`Parse err`)
+      log('ERR', 'STT message parse error')
     }
   }
 }
