@@ -3,6 +3,7 @@ import { setPageContent, updateText, formatListenDisplay, setSplitLayout, update
 import { appState } from '../services/state'
 import { SttClient } from '../services/stt'
 import { ApiClient } from '../services/api'
+import { log } from '../services/logger'
 
 const DISPLAY_ID = 0
 let sttClient: SttClient | null = null
@@ -117,6 +118,7 @@ function stopIndicator(): void {
 }
 
 function pauseListening(): void {
+  log('SESSION', 'Paused')
   listenState = 'paused'
   stopIndicator()
   if (currentBridge) {
@@ -128,6 +130,7 @@ function pauseListening(): void {
 
 async function resumeListening(): Promise<void> {
   if (!currentBridge || !currentApi) return
+  log('SESSION', 'Resumed')
   listenState = 'active'
   partialText = ''
   sttStatus = ''
@@ -147,9 +150,12 @@ async function resumeListening(): Promise<void> {
       partialText = ''
       if (isNoise(text)) return
       const chunks = splitIntoChunks(text)
+      const sourceLang = appState.settings.listenLang
+      const targetLang = appState.settings.translateLang
       for (const chunk of chunks) {
         const idx = committedPairs.length
         committedPairs.push({ original: chunk, translation: '' })
+        log('STT', `Chunk queued for translation: "${chunk.slice(0, 60)}" ${sourceLang}>${targetLang}`)
         updateDisplay()
 
         const saveP = new Promise<string | null>((resolve) => {
@@ -158,24 +164,27 @@ async function resumeListening(): Promise<void> {
             if (sessionId) {
               try {
                 const p = await currentApi!.appendParagraph(sessionId, chunk, '')
+                log('SAVE', `Paragraph saved id=${p.id}`)
                 resolve(p.id)
                 return
-              } catch {}
+              } catch (e) { log('ERR', `Paragraph save failed: ${e instanceof Error ? e.message : String(e)}`) }
             }
             resolve(null)
           })
         })
 
-        currentApi!.translate(chunk, appState.settings.listenLang, appState.settings.translateLang)
+        const translateStart = Date.now()
+        currentApi!.translate(chunk, sourceLang, targetLang)
           .then(async (translated) => {
             if (translated) {
+              log('TRANSLATE', `Response: "${translated.slice(0, 60)}" (${Date.now() - translateStart}ms)`)
               committedPairs[idx].translation = translated
               updateDisplay()
               const paraId = await saveP
-              if (paraId) currentApi!.updateParagraphTranslation(paraId, translated).catch(() => {})
+              if (paraId) currentApi!.updateParagraphTranslation(paraId, translated).catch((e) => { log('ERR', `Translation update failed: ${e instanceof Error ? e.message : String(e)}`) })
             }
           })
-          .catch(() => {})
+          .catch((e) => { log('ERR', `Translation failed: ${e instanceof Error ? e.message : String(e)}`) })
       }
     })
 
@@ -194,6 +203,7 @@ async function resumeListening(): Promise<void> {
 }
 
 function fullStop(): void {
+  log('SESSION', 'Stopped')
   stopIndicator()
   if (currentBridge) {
     try { currentBridge.audioControl(false) } catch {}
@@ -225,6 +235,7 @@ export async function startListening(bridge: any, api: ApiClient): Promise<void>
       appState.settings.translateLang
     )
     appState.currentSessionId = session.id
+    log('SESSION', `Created id=${session.id}, ${appState.settings.listenLang}>${appState.settings.translateLang}`)
     window.dispatchEvent(new CustomEvent('notewriter:session-created'))
 
     const { token } = await api.getSttToken()
@@ -248,6 +259,7 @@ export async function startListening(bridge: any, api: ApiClient): Promise<void>
       for (const chunk of chunks) {
         const idx = committedPairs.length
         committedPairs.push({ original: chunk, translation: '' })
+        log('STT', `Chunk queued for translation: "${chunk.slice(0, 60)}" ${sourceLang}>${targetLang}`)
         updateDisplay()
 
         // Save sequentially (queue ensures correct order)
@@ -257,26 +269,29 @@ export async function startListening(bridge: any, api: ApiClient): Promise<void>
             if (sessionId) {
               try {
                 const p = await api.appendParagraph(sessionId, chunk, '')
+                log('SAVE', `Paragraph saved id=${p.id}`)
                 window.dispatchEvent(new CustomEvent('notewriter:session-updated'))
                 resolve(p.id)
                 return
-              } catch {}
+              } catch (e) { log('ERR', `Paragraph save failed: ${e instanceof Error ? e.message : String(e)}`) }
             }
             resolve(null)
           })
         })
 
         // Translate in parallel (don't wait in queue)
+        const translateStart = Date.now()
         api.translate(chunk, sourceLang, targetLang)
           .then(async (translated) => {
             if (translated) {
+              log('TRANSLATE', `Response: "${translated.slice(0, 60)}" (${Date.now() - translateStart}ms)`)
               committedPairs[idx].translation = translated
               updateDisplay()
               const paraId = await savePromise
-              if (paraId) api.updateParagraphTranslation(paraId, translated).catch(() => {})
+              if (paraId) api.updateParagraphTranslation(paraId, translated).catch((e) => { log('ERR', `Translation update failed: ${e instanceof Error ? e.message : String(e)}`) })
             }
           })
-          .catch(() => {})
+          .catch((e) => { log('ERR', `Translation failed: ${e instanceof Error ? e.message : String(e)}`) })
       }
     })
 
@@ -285,10 +300,12 @@ export async function startListening(bridge: any, api: ApiClient): Promise<void>
 
     sttClient.connect()
     bridge.audioControl(true)
+    log('SESSION', 'Start listening')
     startIndicator()
     updateDisplay()
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
+    log('ERR', `Start listening failed: ${msg}`)
     updateText(bridge, DISPLAY_ID, `Error: ${msg}\nDouble-click to go back.`)
   }
 }
