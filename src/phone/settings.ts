@@ -1,3 +1,4 @@
+import { download, clear } from '../services/logger'
 import type { ApiClient } from '../services/api'
 import type { Language } from '../types'
 
@@ -67,5 +68,29 @@ export function initSettings(api: ApiClient, showToast: ShowToast): void {
     } finally {
       saveBtn.disabled = false
     }
+  })
+
+  // Log file controls
+  const logToggle = document.getElementById('log-toggle') as HTMLAnchorElement
+  const logControls = document.getElementById('log-controls') as HTMLDivElement
+  const logDownloadBtn = document.getElementById('log-download-btn') as HTMLButtonElement
+  const logClearBtn = document.getElementById('log-clear-btn') as HTMLButtonElement
+
+  logToggle.addEventListener('click', (e) => {
+    e.preventDefault()
+    const visible = logControls.style.display !== 'none'
+    logControls.style.display = visible ? 'none' : 'block'
+    logToggle.textContent = visible ? 'Log file ›' : 'Log file ‹'
+  })
+
+  logDownloadBtn.addEventListener('click', () => {
+    if (!download()) {
+      showToast('Log is empty')
+    }
+  })
+
+  logClearBtn.addEventListener('click', () => {
+    clear()
+    showToast('Log cleared')
   })
 }
