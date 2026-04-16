@@ -4,6 +4,7 @@ import { appState } from '../services/state'
 import { SttClient } from '../services/stt'
 import { ApiClient } from '../services/api'
 import type { DialogueMessage } from '../types'
+import { log } from '../services/logger'
 
 const DISPLAY_ID = 0
 type DialogueState = 'listening' | 'generating' | 'showing_answer' | 'paused'
@@ -145,9 +146,10 @@ async function startAudio(api: ApiClient): Promise<void> {
             try {
               const p = await api.appendParagraph(sessionId, chunk, '')
               window.dispatchEvent(new CustomEvent('notewriter:session-updated'))
+              log('SAVE', `Dialogue paragraph saved id=${p.id}`)
               resolve(p.id)
               return
-            } catch {}
+            } catch (e) { log('ERR', `Dialogue paragraph save failed: ${e instanceof Error ? e.message : String(e)}`) }
           }
           resolve(null)
         })
@@ -159,10 +161,10 @@ async function startAudio(api: ApiClient): Promise<void> {
             committedPairs[idx].translation = translated
             updateDisplay()
             const paraId = await saveP
-            if (paraId) api.updateParagraphTranslation(paraId, translated).catch(() => {})
+            if (paraId) api.updateParagraphTranslation(paraId, translated).catch((e) => { log('ERR', `Dialogue translation update failed: ${e instanceof Error ? e.message : String(e)}`) })
           }
         })
-        .catch(() => {})
+        .catch((e) => { log('ERR', `Dialogue translation failed: ${e instanceof Error ? e.message : String(e)}`) })
     }
   })
 
@@ -178,6 +180,9 @@ async function generateAnswer(): Promise<void> {
   stopAudio()
   updateDisplay()
 
+  log('DIALOGUE', `Request sent (messages=${conversationHistory.length})`)
+  const dialogueStart = Date.now()
+
   try {
     const result = await currentApi!.generateDialogue(
       conversationHistory,
@@ -187,6 +192,7 @@ async function generateAnswer(): Promise<void> {
       appState.settings.translateLang
     )
     lastAnswer = result
+    log('DIALOGUE', `Response received (${Date.now() - dialogueStart}ms)`)
     conversationHistory.push({ role: 'self', text: result.response })
     // Trim history to max 15 turns
     if (conversationHistory.length > 15) conversationHistory = conversationHistory.slice(-15)
@@ -194,13 +200,14 @@ async function generateAnswer(): Promise<void> {
     if (appState.currentSessionId) {
       currentApi!.appendParagraph(appState.currentSessionId, `[AI] ${result.response}`, result.translation)
         .then(() => window.dispatchEvent(new CustomEvent('notewriter:session-updated')))
-        .catch(() => {})
+        .catch((e) => { log('ERR', `Dialogue paragraph save failed: ${e instanceof Error ? e.message : String(e)}`) })
     }
 
     dialogueState = 'showing_answer'
     updateDisplay()
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
+    log('ERR', `Dialogue failed: ${msg}`)
     updateText(currentBridge, DISPLAY_ID, `Error: ${msg.slice(0, 100)}\nClick = retry\nDouble-click = exit`)
     dialogueState = 'paused'
   }
@@ -216,12 +223,14 @@ export async function startDialogue(bridge: any, api: ApiClient): Promise<void> 
   try {
     const session = await api.createSession(appState.settings.listenLang, appState.settings.translateLang, 'dialogue')
     appState.currentSessionId = session.id
+    log('SESSION', `Dialogue created id=${session.id}`)
     window.dispatchEvent(new CustomEvent('notewriter:session-created'))
     await startAudio(api)
     startIndicator()
     updateDisplay()
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
+    log('ERR', `Start dialogue failed: ${msg}`)
     updateText(bridge, DISPLAY_ID, `Error: ${msg}\nDouble-click to go back.`)
     dialogueState = 'paused'
   }
