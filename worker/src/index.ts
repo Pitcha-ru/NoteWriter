@@ -108,7 +108,7 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
   if (path === '/api/settings') {
     if (request.method === 'GET') {
       const settings = await getSettings(deviceId, env.DB)
-      const s = settings ?? { listen_lang: 'en', translate_lang: 'el', context: '', persona: '', translate_provider: 'amazon', translate_model: 'gpt-4o-mini' }
+      const s = settings ?? { listen_lang: 'en', translate_lang: 'el', context: '', persona: '', translate_provider: 'openai', translate_model: 'gpt-4o-mini' }
       return json({ listen_lang: s.listen_lang, translate_lang: s.translate_lang, context: s.context, persona: s.persona, translate_provider: s.translate_provider, translate_model: s.translate_model, listenLang: s.listen_lang, translateLang: s.translate_lang, translateProvider: s.translate_provider, translateModel: s.translate_model })
     }
     if (request.method === 'PUT') {

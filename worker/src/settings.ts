@@ -7,7 +7,7 @@ export async function getSettings(deviceId: string, db: D1Database): Promise<Set
     .bind(deviceId)
     .first<{ listen_lang: string; translate_lang: string; context: string; persona: string; translate_provider: string | null; translate_model: string | null }>()
   if (!row) return null
-  return { ...row, translate_provider: row.translate_provider ?? 'amazon', translate_model: row.translate_model ?? 'gpt-4o-mini' }
+  return { ...row, translate_provider: row.translate_provider ?? 'openai', translate_model: row.translate_model ?? 'gpt-4o-mini' }
 }
 
 export async function updateSettings(deviceId: string, settings: SettingsPayload, db: D1Database): Promise<{ error?: string }> {

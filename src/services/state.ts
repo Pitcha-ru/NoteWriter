@@ -3,7 +3,7 @@ import type { Settings, Language } from '../types'
 export type Screen = 'menu' | 'listen' | 'history_list' | 'history_detail' | 'settings' | 'dialogue' | 'notes_list' | 'notes_detail'
 
 export class AppState {
-  settings: Settings = { listenLang: 'en', translateLang: 'el', context: '', persona: '', translateProvider: 'amazon', translateModel: 'gpt-4o-mini' }
+  settings: Settings = { listenLang: 'en', translateLang: 'el', context: '', persona: '', translateProvider: 'openai', translateModel: 'gpt-4o-mini' }
   currentScreen: Screen = 'menu'
   keysConfigured = false
   openaiKeyConfigured = false

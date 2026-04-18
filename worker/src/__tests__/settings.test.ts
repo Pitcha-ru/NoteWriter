@@ -23,7 +23,7 @@ function createMockD1() {
                   translate_lang: 'el',
                   context: '',
                   persona: '',
-                  translate_provider: 'amazon',
+                  translate_provider: 'openai',
                   translate_model: 'gpt-4o-mini',
                 })
               }
@@ -58,7 +58,7 @@ describe('settings', () => {
 
   it('returns settings for device', async () => {
     const settings = await getSettings('device-1', db)
-    expect(settings).toEqual({ listen_lang: 'en', translate_lang: 'el', context: '', persona: '', translate_provider: 'amazon', translate_model: 'gpt-4o-mini' })
+    expect(settings).toEqual({ listen_lang: 'en', translate_lang: 'el', context: '', persona: '', translate_provider: 'openai', translate_model: 'gpt-4o-mini' })
   })
 
   it('returns null for unknown device', async () => {
