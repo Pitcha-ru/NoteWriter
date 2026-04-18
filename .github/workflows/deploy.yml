@@ -15,7 +15,7 @@ jobs:
       - name: Install plugin dependencies
         run: npm ci
       - name: Install worker dependencies
-        run: cd worker && npm ci
+        run: cd worker && npm install
       - name: Run worker tests
         run: cd worker && npm test
       - name: Run plugin tests
