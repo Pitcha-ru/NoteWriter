@@ -10,6 +10,7 @@ interface KeyField {
   fullValue: string   // stored after user saves, cleared on reload
   isEditing: boolean
   isRevealed: boolean
+  plainText?: boolean // if true, don't mask the field
 }
 
 export function initKeys(api: ApiClient, showToast: ShowToast): void {
@@ -59,7 +60,7 @@ export function initKeys(api: ApiClient, showToast: ShowToast): void {
     awsRegion: {
       input: document.getElementById('key-aws-region') as HTMLInputElement,
       statusEl: document.getElementById('status-aws-region') as HTMLElement,
-      maskedValue: '', fullValue: '', isEditing: false, isRevealed: false,
+      maskedValue: '', fullValue: '', isEditing: false, isRevealed: false, plainText: true,
     },
     openai: {
       input: document.getElementById('key-openai') as HTMLInputElement,
@@ -70,7 +71,10 @@ export function initKeys(api: ApiClient, showToast: ShowToast): void {
 
   function renderField(field: KeyField): void {
     if (field.isEditing) return
-    if (field.isRevealed && field.fullValue) {
+    if (field.plainText) {
+      field.input.value = field.maskedValue || field.input.value
+      field.input.type = 'text'
+    } else if (field.isRevealed && field.fullValue) {
       field.input.value = field.fullValue
       field.input.type = 'text'
     } else {
