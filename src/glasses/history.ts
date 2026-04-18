@@ -46,9 +46,10 @@ function renderHistoryList(bridge: any): void {
     const preview = s.preview ? s.preview.slice(0, 35) : '(empty)'
     return `${cursor}${dateStr} ${preview}`
   })
-  // Show scroll indicator if more items exist
   const indicator = `${listCursorIndex + 1}/${sessions.length}`
-  updateText(bridge, DISPLAY_ID, `${indicator}\n${lines.join('\n')}`)
+  const content = `${indicator}\n${lines.join('\n')}`
+  // Use setMenuContent to update — it keeps top-down order (no bottom-up truncation)
+  setMenuContent(bridge, content)
 }
 
 export async function showHistoryList(bridge: any, api: ApiClient): Promise<void> {
