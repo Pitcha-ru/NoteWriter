@@ -25,7 +25,20 @@ export function initKeys(api: ApiClient, showToast: ShowToast): void {
     awsCard.style.display = isOpenai ? 'none' : 'block'
     modelField.style.display = isOpenai ? 'block' : 'none'
   }
-  providerSelect.addEventListener('change', onProviderChange)
+
+  // Auto-save provider/model when changed
+  async function saveProviderSettings(): Promise<void> {
+    const translateProvider = providerSelect.value as TranslateProvider
+    const translateModel = modelSelect.value
+    try {
+      await api.saveSettings({ translateProvider, translateModel })
+      window.dispatchEvent(new CustomEvent('notewriter:settings-changed', { detail: { translateProvider, translateModel } }))
+      window.dispatchEvent(new CustomEvent('notewriter:keys-changed'))
+    } catch {}
+  }
+
+  providerSelect.addEventListener('change', () => { onProviderChange(); saveProviderSettings() })
+  modelSelect.addEventListener('change', () => { saveProviderSettings() })
 
   const fields: Record<string, KeyField> = {
     elevenlabs: {
