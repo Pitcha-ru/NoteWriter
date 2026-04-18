@@ -1,4 +1,5 @@
 import type { ApiClient } from '../services/api'
+import type { TranslateProvider } from '../types'
 
 type ShowToast = (message: string, isError?: boolean) => void
 
@@ -13,6 +14,18 @@ interface KeyField {
 
 export function initKeys(api: ApiClient, showToast: ShowToast): void {
   const saveBtn = document.getElementById('keys-save-btn') as HTMLButtonElement
+  const providerSelect = document.getElementById('keys-translate-provider') as HTMLSelectElement
+  const modelSelect = document.getElementById('keys-translate-model') as HTMLSelectElement
+  const modelField = document.getElementById('keys-translate-model-field') as HTMLDivElement
+  const awsCard = document.getElementById('keys-aws-card') as HTMLDivElement
+
+  // Show/hide AWS card and model field based on provider
+  function onProviderChange(): void {
+    const isOpenai = providerSelect.value === 'openai'
+    awsCard.style.display = isOpenai ? 'none' : 'block'
+    modelField.style.display = isOpenai ? 'block' : 'none'
+  }
+  providerSelect.addEventListener('change', onProviderChange)
 
   const fields: Record<string, KeyField> = {
     elevenlabs: {
@@ -113,17 +126,21 @@ export function initKeys(api: ApiClient, showToast: ShowToast): void {
     })
   })
 
-  // Load masked keys on init
+  // Load masked keys and translation settings on init
   async function loadMasked(): Promise<void> {
     try {
-      const masked = await api.getKeys()
+      const [masked, settings] = await Promise.all([api.getKeys(), api.getSettings()])
       showMasked(fields.elevenlabs, masked.elevenlabsKey)
       showMasked(fields.awsAccess, masked.awsAccessKeyId)
       showMasked(fields.awsSecret, masked.awsSecretAccessKey)
       showMasked(fields.awsRegion, masked.awsRegion)
       showMasked(fields.openai, masked.openaiKey)
+      providerSelect.value = settings.translateProvider ?? 'amazon'
+      modelSelect.value = settings.translateModel ?? 'gpt-4o-mini'
+      onProviderChange()
     } catch {
       // Not configured yet
+      onProviderChange()
     }
   }
 
@@ -164,6 +181,14 @@ export function initKeys(api: ApiClient, showToast: ShowToast): void {
         field.isEditing = false
         field.isRevealed = false
       }
+      // Save translation provider/model to settings
+      const translateProvider = providerSelect.value as TranslateProvider
+      const translateModel = modelSelect.value
+      try {
+        const currentSettings = await api.getSettings()
+        await api.saveSettings({ ...currentSettings, translateProvider, translateModel })
+        window.dispatchEvent(new CustomEvent('notewriter:settings-changed', { detail: { ...currentSettings, translateProvider, translateModel } }))
+      } catch {}
       showToast('Keys saved.')
       window.dispatchEvent(new CustomEvent('notewriter:keys-changed'))
       await loadMasked()

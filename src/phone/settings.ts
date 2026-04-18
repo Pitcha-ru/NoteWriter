@@ -1,6 +1,6 @@
 import { download, clear, copyToClipboard } from '../services/logger'
 import type { ApiClient } from '../services/api'
-import type { Language, TranslateProvider } from '../types'
+import type { Language } from '../types'
 
 type ShowToast = (message: string, isError?: boolean) => void
 
@@ -11,9 +11,6 @@ export function initSettings(api: ApiClient, showToast: ShowToast): void {
   const warnEl          = document.getElementById('settings-same-lang-warn') as HTMLParagraphElement
   const contextArea     = document.getElementById('settings-context')        as HTMLTextAreaElement
   const personaArea     = document.getElementById('settings-persona')        as HTMLTextAreaElement
-  const providerSelect  = document.getElementById('settings-translate-provider') as HTMLSelectElement
-  const modelInput      = document.getElementById('settings-translate-model')    as HTMLInputElement
-  const modelField      = document.getElementById('settings-translate-model-field') as HTMLDivElement
 
   // Hide warning whenever user changes a dropdown
   function onSelectChange(): void {
@@ -25,11 +22,6 @@ export function initSettings(api: ApiClient, showToast: ShowToast): void {
   listenSelect.addEventListener('change', onSelectChange)
   translateSelect.addEventListener('change', onSelectChange)
 
-  // Show/hide model field based on provider
-  function onProviderChange(): void {
-    if (modelField) modelField.style.display = providerSelect?.value === 'openai' ? 'block' : 'none'
-  }
-  if (providerSelect) providerSelect.addEventListener('change', onProviderChange)
 
   // Load current settings on init
   async function loadSettings(): Promise<void> {
@@ -39,9 +31,6 @@ export function initSettings(api: ApiClient, showToast: ShowToast): void {
       translateSelect.value = settings.translateLang
       contextArea.value = settings.context ?? ''
       personaArea.value = settings.persona ?? ''
-      if (providerSelect) providerSelect.value = settings.translateProvider ?? 'amazon'
-      if (modelInput) modelInput.value = settings.translateModel ?? 'gpt-4o-mini'
-      onProviderChange()
     } catch {
       // silently ignore — dropdowns keep their default (en)
     }
@@ -71,12 +60,10 @@ export function initSettings(api: ApiClient, showToast: ShowToast): void {
     saveBtn.disabled = true
 
     try {
-      const translateProvider = (providerSelect?.value ?? 'amazon') as TranslateProvider
-      const translateModel = modelInput?.value || 'gpt-4o-mini'
-      await api.saveSettings({ listenLang, translateLang, context: contextArea.value, persona: personaArea.value, translateProvider, translateModel })
+      await api.saveSettings({ listenLang, translateLang, context: contextArea.value, persona: personaArea.value })
       showToast('Settings saved.')
       // Notify glasses UI that settings changed
-      window.dispatchEvent(new CustomEvent('notewriter:settings-changed', { detail: { listenLang, translateLang, context: contextArea.value, persona: personaArea.value, translateProvider, translateModel } }))
+      window.dispatchEvent(new CustomEvent('notewriter:settings-changed', { detail: { listenLang, translateLang, context: contextArea.value, persona: personaArea.value } }))
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to save settings.', true)
     } finally {

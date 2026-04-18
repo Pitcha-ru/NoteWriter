@@ -114,13 +114,15 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
     if (request.method === 'PUT') {
       const raw = await request.json<any>()
       // Accept both camelCase (listenLang) and snake_case (listen_lang)
+      // Merge with existing settings to avoid overwriting fields not included in request
+      const existing = await getSettings(deviceId, env.DB)
       const body: SettingsPayload = {
-        listen_lang: raw.listen_lang ?? raw.listenLang,
-        translate_lang: raw.translate_lang ?? raw.translateLang,
-        context: raw.context ?? '',
-        persona: raw.persona ?? '',
-        translate_provider: raw.translate_provider ?? raw.translateProvider ?? 'amazon',
-        translate_model: raw.translate_model ?? raw.translateModel ?? 'gpt-4o-mini',
+        listen_lang: raw.listen_lang ?? raw.listenLang ?? existing?.listen_lang ?? 'en',
+        translate_lang: raw.translate_lang ?? raw.translateLang ?? existing?.translate_lang ?? 'el',
+        context: raw.context ?? existing?.context ?? '',
+        persona: raw.persona ?? existing?.persona ?? '',
+        translate_provider: raw.translate_provider ?? raw.translateProvider ?? existing?.translate_provider ?? 'amazon',
+        translate_model: raw.translate_model ?? raw.translateModel ?? existing?.translate_model ?? 'gpt-4o-mini',
       }
       const result = await updateSettings(deviceId, body, env.DB)
       if (result.error) return json({ error: result.error }, 400)

@@ -159,7 +159,7 @@ export class ApiClient {
   async saveKeys(keys: ApiKeys): Promise<void> { await this.request('/api/keys', { method: 'PUT', body: JSON.stringify(toSnake(keys)) }) }
   async deleteKeys(): Promise<void> { await this.request('/api/keys', { method: 'DELETE' }) }
   async getSettings(): Promise<Settings> { return this.request('/api/settings') }
-  async saveSettings(settings: Settings): Promise<void> { await this.request('/api/settings', { method: 'PUT', body: JSON.stringify(settings) }) }
+  async saveSettings(settings: Partial<Settings>): Promise<void> { await this.request('/api/settings', { method: 'PUT', body: JSON.stringify(settings) }) }
 
   async listNotes(): Promise<Note[]> { return this.request('/api/notes') }
   async getNote(id: string): Promise<Note> { return this.request(`/api/notes/${id}`) }
