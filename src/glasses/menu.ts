@@ -1,5 +1,5 @@
 // src/glasses/menu.ts
-import { setPageContent, formatMenuText } from './renderer'
+import { setMenuContent, formatMenuText } from './renderer'
 import { appState } from '../services/state'
 
 const MENU_ITEMS = ['Listen', 'Dialogue', 'Notes', 'History', 'Settings']
@@ -24,7 +24,7 @@ function renderMenu(bridge: any): void {
     }
     return text
   })
-  setPageContent(bridge, formatMenuText(items, selectedIndex))
+  setMenuContent(bridge, formatMenuText(items, selectedIndex))
 }
 
 export function handleMenuEvent(

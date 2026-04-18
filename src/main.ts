@@ -100,13 +100,16 @@ async function init() {
 
   window.addEventListener('notewriter:glasses-stop', () => {
     resetAll()
-    try { bridge.shutDownPageContainer(0) } catch {}
+    try { bridge.shutDownPageContainer(1) } catch {}
     resetPage()
   })
 
   // Block click events briefly after screen transitions
   // (simulator sends a ghost click after double-click)
   let lastScreenChange = 0
+  // Debounce scroll/swipe events to reduce sensitivity
+  let lastScrollTime = 0
+  const SCROLL_DEBOUNCE_MS = 250
 
   function navigateWithGuard(fn: () => void): void {
     lastScreenChange = Date.now()
@@ -135,6 +138,10 @@ async function init() {
     // Block CLICK events for 1.5s after screen change (ghost click from double-click)
     if (eventType === 0 && Date.now() - lastScreenChange < 1500) return
 
+    // Debounce scroll/swipe events
+    if ((eventType === 1 || eventType === 2) && Date.now() - lastScrollTime < SCROLL_DEBOUNCE_MS) return
+    if (eventType === 1 || eventType === 2) lastScrollTime = Date.now()
+
     // FOREGROUND_ENTER
     if (eventType === 4) {
       api.getSettings().then(s => appState.updateSettings(s)).catch(() => {})
@@ -154,7 +161,7 @@ async function init() {
         onSettings: () => navigateWithGuard(() => showSettings(bridge)),
         onExit: () => {
           resetAll()
-          try { bridge.shutDownPageContainer(0) } catch {}
+          try { bridge.shutDownPageContainer(1) } catch {}
           resetPage()
           window.dispatchEvent(new CustomEvent('notewriter:glasses-stopped'))
         },

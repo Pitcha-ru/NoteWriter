@@ -48,6 +48,17 @@ export function clear(): void {
   try { localStorage.removeItem(STORAGE_KEY) } catch {}
 }
 
+export async function copyToClipboard(): Promise<boolean> {
+  if (entries.length === 0) return false
+  const text = entries.join('\n') + '\n'
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function getEntries(): string[] {
   return entries
 }

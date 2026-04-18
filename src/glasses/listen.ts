@@ -37,19 +37,35 @@ function resetListenState(): void {
 // Split long text into sentence-sized chunks (~100 chars each)
 function splitIntoChunks(text: string, maxLen = 120): string[] {
   if (text.length <= maxLen) return [text]
-  // Split on sentence boundaries
-  const sentences = text.match(/[^.!?;]+[.!?;]+\s*/g) || [text]
+  // Try splitting on sentence boundaries first
+  const sentences = text.match(/[^.!?;]+[.!?;]+\s*/g)
+  if (sentences && sentences.length > 1) {
+    const chunks: string[] = []
+    let current = ''
+    for (const s of sentences) {
+      if (current.length + s.length > maxLen && current) {
+        chunks.push(current.trim())
+        current = s
+      } else {
+        current += s
+      }
+    }
+    if (current.trim()) chunks.push(current.trim())
+    if (chunks.length > 1) return chunks
+  }
+  // Fallback: split on word boundaries when no punctuation found
+  const words = text.split(/\s+/)
   const chunks: string[] = []
   let current = ''
-  for (const s of sentences) {
-    if (current.length + s.length > maxLen && current) {
-      chunks.push(current.trim())
-      current = s
+  for (const w of words) {
+    if (current.length + w.length + 1 > maxLen && current) {
+      chunks.push(current)
+      current = w
     } else {
-      current += s
+      current = current ? current + ' ' + w : w
     }
   }
-  if (current.trim()) chunks.push(current.trim())
+  if (current) chunks.push(current)
   return chunks.length > 0 ? chunks : [text]
 }
 

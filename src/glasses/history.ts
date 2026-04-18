@@ -1,5 +1,5 @@
 // src/glasses/history.ts
-import { setPageContent, updateText, formatHistoryDetail } from './renderer'
+import { setPageContent, setMenuContent, updateText, formatHistoryDetail } from './renderer'
 import { appState } from '../services/state'
 import { ApiClient } from '../services/api'
 import type { Session, Paragraph } from '../types'
@@ -29,7 +29,7 @@ let currentParagraphIndex = 0
 
 function renderHistoryList(bridge: any): void {
   if (sessions.length === 0) {
-    setPageContent(bridge, 'No recordings yet.\nDouble-click to go back.')
+    setMenuContent(bridge, 'No recordings yet.\nDouble-click to go back.')
     return
   }
 
@@ -56,7 +56,7 @@ export async function showHistoryList(bridge: any, api: ApiClient): Promise<void
   listCursorIndex = 0
   listScrollOffset = 0
 
-  setPageContent(bridge, 'Loading...')
+  setMenuContent(bridge, 'Loading...')
 
   try {
     const response = await api.listSessions()
@@ -122,7 +122,7 @@ export async function showSessionDetail(bridge: any, api: ApiClient, sessionInde
     return
   }
 
-  updateText(bridge, DISPLAY_ID, 'Loading...')
+  setPageContent(bridge, 'Loading...')
 
   try {
     const response = await api.getSession(session.id)
@@ -131,6 +131,7 @@ export async function showSessionDetail(bridge: any, api: ApiClient, sessionInde
     if (paragraphs.length === 0) {
       updateText(bridge, DISPLAY_ID, 'No content in this session.\nDouble-click to go back.')
     } else {
+      currentParagraphIndex = 0
       renderParagraph(bridge)
     }
   } catch {

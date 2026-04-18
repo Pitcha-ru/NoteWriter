@@ -12,6 +12,7 @@ let pageCreated = false
 
 export function resetPage(): void {
   pageCreated = false
+  currentLayout = null
 }
 
 /**
@@ -19,6 +20,58 @@ export function resetPage(): void {
  * First call uses createStartUpPageContainer; all subsequent calls use rebuildPageContainer.
  * Never resets — createStartUpPageContainer is called only once per app lifecycle.
  */
+// Track current layout mode so we only rebuild when switching layouts
+let currentLayout: 'menu' | 'single' | 'split' | null = null
+
+/**
+ * Menu-only layout: 2 containers — visible content (no scroll) + invisible event catcher.
+ * Prevents native scroll jitter when navigating menu with UP/DOWN.
+ */
+export function setMenuContent(bridge: any, content: string): void {
+  const truncated = content.length > 2000 ? content.slice(-2000) : content
+  const contentProp = new TextContainerProperty({
+    containerID: 0,
+    content: truncated,
+    isEventCapture: 0,
+    width: 576,
+    height: 280,
+    xPosition: 0,
+    yPosition: 0,
+  })
+  const eventProp = new TextContainerProperty({
+    containerID: 1,
+    content: '',
+    isEventCapture: 1,
+    width: 1,
+    height: 1,
+    xPosition: 575,
+    yPosition: 287,
+  })
+
+  if (!pageCreated) {
+    pageCreated = true
+    currentLayout = 'menu'
+    bridge.createStartUpPageContainer(
+      new CreateStartUpPageContainer({
+        containerTotalNum: 2,
+        textObject: [contentProp, eventProp],
+      })
+    )
+  } else if (currentLayout !== 'menu') {
+    currentLayout = 'menu'
+    bridge.rebuildPageContainer(
+      new RebuildPageContainer({
+        containerTotalNum: 2,
+        textObject: [contentProp, eventProp],
+      })
+    )
+  } else {
+    bridge.textContainerUpgrade(
+      new TextContainerUpgrade({ containerID: 0, content: truncated })
+    )
+  }
+}
+
 export function setPageContent(bridge: any, content: string): void {
   const truncated = content.length > 2000 ? content.slice(-2000) : content
   const textProp = new TextContainerProperty({
@@ -31,18 +84,24 @@ export function setPageContent(bridge: any, content: string): void {
 
   if (!pageCreated) {
     pageCreated = true
+    currentLayout = 'single'
     bridge.createStartUpPageContainer(
       new CreateStartUpPageContainer({
         containerTotalNum: 1,
         textObject: [textProp],
       })
     )
-  } else {
+  } else if (currentLayout !== 'single') {
+    currentLayout = 'single'
     bridge.rebuildPageContainer(
       new RebuildPageContainer({
         containerTotalNum: 1,
         textObject: [textProp],
       })
+    )
+  } else {
+    bridge.textContainerUpgrade(
+      new TextContainerUpgrade({ containerID: 0, content: truncated })
     )
   }
 }
@@ -73,13 +132,15 @@ export function setSplitLayout(bridge: any, topText: string, bottomText: string)
 
   if (!pageCreated) {
     pageCreated = true
+    currentLayout = 'split'
     bridge.createStartUpPageContainer(
       new CreateStartUpPageContainer({
         containerTotalNum: 2,
         textObject: [topProp, bottomProp],
       })
     )
-  } else {
+  } else if (currentLayout !== 'split') {
+    currentLayout = 'split'
     bridge.rebuildPageContainer(
       new RebuildPageContainer({
         containerTotalNum: 2,

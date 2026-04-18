@@ -13,10 +13,10 @@
     "aws4fetch": "^1.0.20"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.5.0",
+    "@cloudflare/vitest-pool-workers": "^0.14.3",
     "@cloudflare/workers-types": "^4.20240512.0",
     "typescript": "^5.4.0",
-    "vitest": "^2.1.0",
-    "wrangler": "^3.57.0"
+    "vitest": "^4.1.4",
+    "wrangler": "^4.81.1"
   }
 }

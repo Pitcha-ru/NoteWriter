@@ -1,4 +1,4 @@
-import { download, clear } from '../services/logger'
+import { download, clear, copyToClipboard } from '../services/logger'
 import type { ApiClient } from '../services/api'
 import type { Language } from '../types'
 
@@ -74,6 +74,7 @@ export function initSettings(api: ApiClient, showToast: ShowToast): void {
   const logToggle = document.getElementById('log-toggle') as HTMLAnchorElement
   const logControls = document.getElementById('log-controls') as HTMLDivElement
   const logDownloadBtn = document.getElementById('log-download-btn') as HTMLButtonElement
+  const logCopyBtn = document.getElementById('log-copy-btn') as HTMLButtonElement
   const logClearBtn = document.getElementById('log-clear-btn') as HTMLButtonElement
 
   logToggle.addEventListener('click', (e) => {
@@ -88,6 +89,13 @@ export function initSettings(api: ApiClient, showToast: ShowToast): void {
       showToast('Log is empty')
     }
   })
+
+  if (logCopyBtn) {
+    logCopyBtn.addEventListener('click', async () => {
+      const ok = await copyToClipboard()
+      showToast(ok ? 'Log copied' : 'Log is empty')
+    })
+  }
 
   logClearBtn.addEventListener('click', () => {
     clear()

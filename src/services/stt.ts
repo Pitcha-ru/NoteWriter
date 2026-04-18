@@ -25,8 +25,44 @@ export class SttClient {
   private reconnectAttempts = 0
   private maxReconnectAttempts = 5
   private shouldReconnect = false
+  private lastTranscriptTime = 0
+  private audioPacketsSinceLastTranscript = 0
+
+  // Session stats
+  private sessionStartTime = 0
+  private totalAudioPackets = 0
+  private totalPartials = 0
+  private totalCommits = 0
+  private gapCount = 0
+  private maxGapMs = 0
+  private totalGapMs = 0
+  private partialIntervals: number[] = []
 
   constructor(token: string, config: SttConfig) { this.token = token; this.config = config }
+
+  private resetStats(): void {
+    this.sessionStartTime = Date.now()
+    this.totalAudioPackets = 0
+    this.totalPartials = 0
+    this.totalCommits = 0
+    this.gapCount = 0
+    this.maxGapMs = 0
+    this.totalGapMs = 0
+    this.partialIntervals = []
+    this.lastTranscriptTime = 0
+    this.audioPacketsSinceLastTranscript = 0
+  }
+
+  private logStats(): void {
+    const duration = ((Date.now() - this.sessionStartTime) / 1000).toFixed(1)
+    const avgInterval = this.partialIntervals.length > 0
+      ? (this.partialIntervals.reduce((a, b) => a + b, 0) / this.partialIntervals.length).toFixed(0)
+      : '-'
+    const maxInterval = this.partialIntervals.length > 0
+      ? Math.max(...this.partialIntervals).toFixed(0)
+      : '-'
+    log('STATS', `Session ${duration}s | audio_pkts=${this.totalAudioPackets} partials=${this.totalPartials} commits=${this.totalCommits} | gaps(>2s)=${this.gapCount} max_gap=${(this.maxGapMs / 1000).toFixed(1)}s total_gap=${(this.totalGapMs / 1000).toFixed(1)}s | partial_interval avg=${avgInterval}ms max=${maxInterval}ms`)
+  }
 
   onPartialTranscript(cb: TranscriptCallback): void { this.partialCallbacks.push(cb) }
   onCommittedTranscript(cb: TranscriptCallback): void { this.committedCallbacks.push(cb) }
@@ -46,7 +82,7 @@ export class SttClient {
       token: this.token,
       audio_format: 'pcm_16000',
       commit_strategy: 'vad',
-      vad_silence_threshold_secs: '1.0',
+      vad_silence_threshold_secs: '0.5',
     })
     if (this.config.language && this.config.language !== 'auto') {
       params.set('language_code', this.config.language)
@@ -58,6 +94,7 @@ export class SttClient {
 
     this.ws.onopen = () => {
       this.reconnectAttempts = 0
+      this.resetStats()
       this.emitStatus('WS open')
       log('STT', 'WebSocket connected')
     }
@@ -100,6 +137,9 @@ export class SttClient {
       return
     }
 
+    this.audioPacketsSinceLastTranscript++
+    this.totalAudioPackets++
+
     // ElevenLabs requires JSON text frames with base64-encoded audio
     const message = JSON.stringify({
       message_type: 'input_audio_chunk',
@@ -110,6 +150,7 @@ export class SttClient {
 
   disconnect(): void {
     this.shouldReconnect = false
+    if (this.sessionStartTime > 0 && this.totalPartials > 0) this.logStats()
     this.ws?.close()
     this.ws = null
   }
@@ -132,12 +173,29 @@ export class SttClient {
       }
 
       if (type === 'partial_transcript' && msg.text) {
+        const now = Date.now()
+        this.totalPartials++
+        if (this.lastTranscriptTime > 0) {
+          const interval = now - this.lastTranscriptTime
+          this.partialIntervals.push(interval)
+          if (interval > 2000) {
+            this.gapCount++
+            this.totalGapMs += interval
+            if (interval > this.maxGapMs) this.maxGapMs = interval
+            log('STT', `GAP ${(interval / 1000).toFixed(1)}s between partials (${this.audioPacketsSinceLastTranscript} audio packets sent during gap)`)
+          }
+        }
+        this.lastTranscriptTime = now
+        this.audioPacketsSinceLastTranscript = 0
         log('STT', `Partial transcript (len=${msg.text.length})`)
         this.partialCallbacks.forEach(cb => cb(msg.text))
         return
       }
 
       if ((type === 'committed_transcript' || type === 'committed_transcript_with_timestamps') && msg.text) {
+        this.lastTranscriptTime = Date.now()
+        this.audioPacketsSinceLastTranscript = 0
+        this.totalCommits++
         log('STT', `Committed: "${msg.text.slice(0, 80)}" (len=${msg.text.length})`)
         this.committedCallbacks.forEach(cb => cb(msg.text))
         return

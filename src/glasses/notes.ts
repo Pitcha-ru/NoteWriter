@@ -1,5 +1,5 @@
 // src/glasses/notes.ts
-import { setPageContent, updateText } from './renderer'
+import { setPageContent, setMenuContent, updateText } from './renderer'
 import { appState } from '../services/state'
 import { ApiClient } from '../services/api'
 import type { Note } from '../types'
@@ -17,7 +17,7 @@ let currentContentIndex = 0
 
 function renderNotesList(bridge: any): void {
   if (notes.length === 0) {
-    setPageContent(bridge, 'No notes yet.\nDouble-click to go back.')
+    setMenuContent(bridge, 'No notes yet.\nDouble-click to go back.')
     return
   }
 
@@ -41,7 +41,7 @@ export async function showNotesList(bridge: any, api: ApiClient): Promise<void> 
   listCursorIndex = 0
   listScrollOffset = 0
 
-  setPageContent(bridge, 'Loading...')
+  setMenuContent(bridge, 'Loading...')
 
   try {
     notes = await api.listNotes()
@@ -133,7 +133,7 @@ export async function showNoteDetail(bridge: any, api: ApiClient, noteIndex: num
     return
   }
 
-  updateText(bridge, DISPLAY_ID, 'Loading...')
+  setPageContent(bridge, 'Loading...')
 
   try {
     const fullNote = await api.getNote(note.id)
