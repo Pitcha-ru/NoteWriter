@@ -170,7 +170,7 @@ async function startAudio(api: ApiClient): Promise<void> {
         })
       })
 
-      api.translate(chunk, appState.settings.listenLang, appState.settings.translateLang)
+      api.translate(chunk, appState.settings.listenLang, appState.settings.translateLang, appState.settings.translateProvider, appState.settings.translateModel)
         .then(async (translated) => {
           if (translated) {
             committedPairs[idx].translation = translated

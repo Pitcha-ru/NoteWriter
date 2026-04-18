@@ -56,9 +56,9 @@ export class ApiClient {
   async getSttToken(): Promise<{ token: string }> {
     return this.request('/api/stt-token', { method: 'POST' })
   }
-  async translate(text: string, sourceLang: string, targetLang: string): Promise<string> {
+  async translate(text: string, sourceLang: string, targetLang: string, provider?: string, model?: string): Promise<string> {
     const r = await this.request<{ translatedText: string }>('/api/translate', {
-      method: 'POST', body: JSON.stringify({ text, source_lang: sourceLang, target_lang: targetLang }),
+      method: 'POST', body: JSON.stringify({ text, source_lang: sourceLang, target_lang: targetLang, provider, model }),
     })
     return r.translatedText
   }

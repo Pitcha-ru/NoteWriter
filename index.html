@@ -475,6 +475,17 @@
             </select>
           </div>
           <p class="warning-msg" id="settings-same-lang-warn">Listen and translate languages must be different.</p>
+          <div class="field">
+            <label for="settings-translate-provider">Translation Provider</label>
+            <select id="settings-translate-provider">
+              <option value="amazon">Amazon Translate</option>
+              <option value="openai">OpenAI</option>
+            </select>
+          </div>
+          <div class="field" id="settings-translate-model-field" style="display:none;">
+            <label for="settings-translate-model">Translation Model</label>
+            <input type="text" id="settings-translate-model" placeholder="gpt-4o-mini" autocomplete="off" />
+          </div>
         </div>
         <div class="card">
           <div class="card-title">Dialogue Settings</div>

@@ -6,11 +6,15 @@ export interface DialogueMessage {
   text: string;
 }
 
+export type TranslateProvider = 'amazon' | 'openai'
+
 export interface Settings {
   listenLang: Language;
   translateLang: Language;
   context: string;
   persona: string;
+  translateProvider: TranslateProvider;
+  translateModel: string;
 }
 
 export interface Session {

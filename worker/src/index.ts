@@ -2,7 +2,7 @@ import { Env, SettingsPayload, DialogueRequest } from './types'
 import { handleRegister, authenticate } from './auth'
 import { getKeys, saveKeys, getMaskedKeys, deleteKeys, getCachedKeys } from './keys'
 import { mintSttToken } from './stt-token'
-import { translateText } from './translate'
+import { translateText, translateWithOpenAI } from './translate'
 import { getSettings, updateSettings } from './settings'
 import { createSession, listSessions, getSession, appendParagraph, updateParagraphTranslation, deleteSession } from './sessions'
 import { buildOpenAIMessages, streamDialogueResponse } from './dialogue'
@@ -108,9 +108,8 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
   if (path === '/api/settings') {
     if (request.method === 'GET') {
       const settings = await getSettings(deviceId, env.DB)
-      const s = settings ?? { listen_lang: 'en', translate_lang: 'el', context: '', persona: '' }
-      // Return both formats for compatibility
-      return json({ listen_lang: s.listen_lang, translate_lang: s.translate_lang, context: s.context, persona: s.persona, listenLang: s.listen_lang, translateLang: s.translate_lang })
+      const s = settings ?? { listen_lang: 'en', translate_lang: 'el', context: '', persona: '', translate_provider: 'amazon', translate_model: 'gpt-4o-mini' }
+      return json({ listen_lang: s.listen_lang, translate_lang: s.translate_lang, context: s.context, persona: s.persona, translate_provider: s.translate_provider, translate_model: s.translate_model, listenLang: s.listen_lang, translateLang: s.translate_lang, translateProvider: s.translate_provider, translateModel: s.translate_model })
     }
     if (request.method === 'PUT') {
       const raw = await request.json<any>()
@@ -120,6 +119,8 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
         translate_lang: raw.translate_lang ?? raw.translateLang,
         context: raw.context ?? '',
         persona: raw.persona ?? '',
+        translate_provider: raw.translate_provider ?? raw.translateProvider ?? 'amazon',
+        translate_model: raw.translate_model ?? raw.translateModel ?? 'gpt-4o-mini',
       }
       const result = await updateSettings(deviceId, body, env.DB)
       if (result.error) return json({ error: result.error }, 400)
@@ -138,7 +139,7 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
 
   // Translate route
   if (path === '/api/translate' && request.method === 'POST') {
-    const body = await request.json<{ text: string; source_lang: string; target_lang: string }>()
+    const body = await request.json<{ text: string; source_lang: string; target_lang: string; provider?: string; model?: string }>()
     if (!body.text || !body.source_lang || !body.target_lang) {
       return json({ error: 'text, source_lang, and target_lang required' }, 400)
     }
@@ -148,7 +149,13 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
     const keys = await getCachedKeys(deviceId, env.KV, env.ENCRYPTION_KEY)
     if (!keys) return json({ error: 'API keys not configured' }, 400)
     try {
-      const translated = await translateText(body.text, body.source_lang, body.target_lang, keys.aws_access_key_id, keys.aws_secret_access_key, keys.aws_region)
+      let translated: string
+      if (body.provider === 'openai') {
+        if (!keys.openai_key) return json({ error: 'OpenAI key not configured' }, 400)
+        translated = await translateWithOpenAI(body.text, body.source_lang, body.target_lang, keys.openai_key, body.model || 'gpt-4o-mini')
+      } else {
+        translated = await translateText(body.text, body.source_lang, body.target_lang, keys.aws_access_key_id, keys.aws_secret_access_key, keys.aws_region)
+      }
       return json({ translated_text: translated })
     } catch (err) {
       return json({ error: err instanceof Error ? err.message : 'Translation failed' }, 502)

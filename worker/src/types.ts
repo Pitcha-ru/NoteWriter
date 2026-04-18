@@ -30,6 +30,8 @@ export interface SettingsPayload {
   translate_lang: string;
   context: string;
   persona: string;
+  translate_provider: string;
+  translate_model: string;
 }
 
 export interface MaskedKeys {

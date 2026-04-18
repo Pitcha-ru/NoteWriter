@@ -81,12 +81,16 @@ function initStartStop(): void {
     }
   }
 
-  // Check if keys are configured
+  // Check if keys are configured based on current translate provider
   async function checkKeys(): Promise<void> {
     try {
-      const keys = await api.getKeys()
-      const hasKeys = keys.elevenlabsKey !== null && keys.awsAccessKeyId !== null
-      setDisabled(!hasKeys)
+      const [keys, settings] = await Promise.all([api.getKeys(), api.getSettings()])
+      const hasElevenlabs = keys.elevenlabsKey !== null
+      const provider = settings.translateProvider ?? 'amazon'
+      const hasTranslateKeys = provider === 'openai'
+        ? keys.openaiKey !== null
+        : keys.awsAccessKeyId !== null
+      setDisabled(!(hasElevenlabs && hasTranslateKeys))
     } catch {
       setDisabled(true)
     }
@@ -94,6 +98,7 @@ function initStartStop(): void {
 
   void checkKeys()
   window.addEventListener('notewriter:keys-changed', () => void checkKeys())
+  window.addEventListener('notewriter:settings-changed', () => void checkKeys())
 
   btn.addEventListener('click', () => {
     if (btn.disabled) return

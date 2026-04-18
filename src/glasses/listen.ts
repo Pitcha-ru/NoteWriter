@@ -190,7 +190,7 @@ async function resumeListening(): Promise<void> {
         })
 
         const translateStart = Date.now()
-        currentApi!.translate(chunk, sourceLang, targetLang)
+        currentApi!.translate(chunk, sourceLang, targetLang, appState.settings.translateProvider, appState.settings.translateModel)
           .then(async (translated) => {
             if (translated) {
               log('TRANSLATE', `Response: "${translated.slice(0, 60)}" (${Date.now() - translateStart}ms)`)
@@ -297,7 +297,7 @@ export async function startListening(bridge: any, api: ApiClient): Promise<void>
 
         // Translate in parallel (don't wait in queue)
         const translateStart = Date.now()
-        api.translate(chunk, sourceLang, targetLang)
+        api.translate(chunk, sourceLang, targetLang, appState.settings.translateProvider, appState.settings.translateModel)
           .then(async (translated) => {
             if (translated) {
               log('TRANSLATE', `Response: "${translated.slice(0, 60)}" (${Date.now() - translateStart}ms)`)
