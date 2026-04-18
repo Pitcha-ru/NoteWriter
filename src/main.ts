@@ -47,7 +47,10 @@ async function init() {
   try { const s = await api.getSettings(); appState.updateSettings(s) } catch {}
   try {
     const k = await api.getKeys()
-    appState.setKeysConfigured(k.elevenlabsKey !== null && k.awsAccessKeyId !== null)
+    const hasElevenlabs = k.elevenlabsKey !== null
+    const provider = appState.settings.translateProvider
+    const hasTranslateKeys = provider === 'openai' ? k.openaiKey !== null : k.awsAccessKeyId !== null
+    appState.setKeysConfigured(hasElevenlabs && hasTranslateKeys)
     appState.openaiKeyConfigured = k.openaiKey !== null
   } catch {}
 
@@ -65,8 +68,13 @@ async function init() {
   })
 
   window.addEventListener('notewriter:settings-changed', (e: any) => {
-    const { listenLang, translateLang, context, persona } = e.detail
-    appState.updateSettings({ listenLang, translateLang, context: context ?? appState.settings.context, persona: persona ?? appState.settings.persona })
+    // Merge only defined fields to avoid overwriting with undefined
+    const detail = e.detail ?? {}
+    const update: Record<string, unknown> = {}
+    for (const key of Object.keys(detail)) {
+      if (detail[key] !== undefined) update[key] = detail[key]
+    }
+    appState.updateSettings(update as any)
     if (appState.currentScreen === 'settings') showSettings(bridge)
   })
 
@@ -146,7 +154,10 @@ async function init() {
     if (eventType === 4) {
       api.getSettings().then(s => appState.updateSettings(s)).catch(() => {})
       api.getKeys().then(k => {
-        appState.setKeysConfigured(k.elevenlabsKey !== null && k.awsAccessKeyId !== null)
+        const hasElevenlabs = k.elevenlabsKey !== null
+        const provider = appState.settings.translateProvider
+        const hasTranslateKeys = provider === 'openai' ? k.openaiKey !== null : k.awsAccessKeyId !== null
+        appState.setKeysConfigured(hasElevenlabs && hasTranslateKeys)
         appState.openaiKeyConfigured = k.openaiKey !== null
       }).catch(() => {})
       return

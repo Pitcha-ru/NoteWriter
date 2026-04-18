@@ -2,6 +2,7 @@
 import { setPageContent, setMenuContent, updateText, formatHistoryDetail } from './renderer'
 import { appState } from '../services/state'
 import { ApiClient } from '../services/api'
+import { log } from '../services/logger'
 import type { Session, Paragraph } from '../types'
 
 const DISPLAY_ID = 0
@@ -61,8 +62,10 @@ export async function showHistoryList(bridge: any, api: ApiClient): Promise<void
   try {
     const response = await api.listSessions()
     sessions = response.sessions
+    log('SESSION', `History loaded: ${sessions.length} sessions`)
     renderHistoryList(bridge)
-  } catch {
+  } catch (e) {
+    log('ERR', `History load failed: ${e instanceof Error ? e.message : String(e)}`)
     updateText(bridge, DISPLAY_ID, 'Failed to load history.\nDouble-click to go back.')
   }
 }
@@ -127,6 +130,7 @@ export async function showSessionDetail(bridge: any, api: ApiClient, sessionInde
   try {
     const response = await api.getSession(session.id)
     paragraphs = response.paragraphs
+    log('SESSION', `Session detail loaded: ${paragraphs.length} paragraphs`)
 
     if (paragraphs.length === 0) {
       updateText(bridge, DISPLAY_ID, 'No content in this session.\nDouble-click to go back.')
@@ -134,7 +138,8 @@ export async function showSessionDetail(bridge: any, api: ApiClient, sessionInde
       currentParagraphIndex = 0
       renderParagraph(bridge)
     }
-  } catch {
+  } catch (e) {
+    log('ERR', `Session detail load failed: ${e instanceof Error ? e.message : String(e)}`)
     updateText(bridge, DISPLAY_ID, 'Failed to load session.\nDouble-click to go back.')
   }
 }
