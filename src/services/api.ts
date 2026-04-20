@@ -160,6 +160,9 @@ export class ApiClient {
   async deleteKeys(): Promise<void> { await this.request('/api/keys', { method: 'DELETE' }) }
   async getSettings(): Promise<Settings> { return this.request('/api/settings') }
   async saveSettings(settings: Partial<Settings>): Promise<void> { await this.request('/api/settings', { method: 'PUT', body: JSON.stringify(settings) }) }
+  async getServerLogs(limit = 200): Promise<Array<{ ts: string; event: string; data: Record<string, unknown> | null; duration_ms: number | null; status: number | null }>> {
+    return this.request(`/api/logs?limit=${limit}`)
+  }
 
   async listNotes(): Promise<Note[]> { return this.request('/api/notes') }
   async getNote(id: string): Promise<Note> { return this.request(`/api/notes/${id}`) }

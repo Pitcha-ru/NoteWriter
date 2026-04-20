@@ -61,7 +61,9 @@
       "Bash(python3 -m json.tool)",
       "Bash(evenhub pack:*)",
       "Bash(/opt/homebrew/bin/gh release create v1.0.0 notewriter.ehpk --title 'NoteWriter v1.0.0' --notes ':*)",
-      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('region:', d.get\\('aws_region'\\)\\)\")"
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('region:', d.get\\('aws_region'\\)\\)\")",
+      "Bash(npx vite:*)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d['version']\\)\")"
     ]
   }
 }

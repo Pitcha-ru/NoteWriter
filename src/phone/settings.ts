@@ -77,6 +77,7 @@ export function initSettings(api: ApiClient, showToast: ShowToast): void {
   const logDownloadBtn = document.getElementById('log-download-btn') as HTMLButtonElement
   const logCopyBtn = document.getElementById('log-copy-btn') as HTMLButtonElement
   const logClearBtn = document.getElementById('log-clear-btn') as HTMLButtonElement
+  const logServerBtn = document.getElementById('log-server-btn') as HTMLButtonElement
 
   logToggle.addEventListener('click', (e) => {
     e.preventDefault()
@@ -101,5 +102,37 @@ export function initSettings(api: ApiClient, showToast: ShowToast): void {
   logClearBtn.addEventListener('click', () => {
     clear()
     showToast('Log cleared')
+  })
+
+  logServerBtn.addEventListener('click', async () => {
+    logServerBtn.disabled = true
+    logServerBtn.textContent = 'Loading…'
+    try {
+      const logs = await api.getServerLogs(200)
+      if (logs.length === 0) {
+        showToast('No server logs yet')
+        return
+      }
+      const lines = logs.map(entry => {
+        const time = entry.ts.replace('T', ' ').replace(/\.\d+Z$/, '')
+        const dur = entry.duration_ms != null ? ` ${entry.duration_ms}ms` : ''
+        const status = entry.status != null ? ` [${entry.status}]` : ''
+        const data = entry.data ? ' ' + JSON.stringify(entry.data) : ''
+        return `${time} ${entry.event}${status}${dur}${data}`
+      })
+      const text = lines.join('\n')
+      const blob = new Blob([text], { type: 'text/plain' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `server-log-${new Date().toISOString().slice(0, 10)}.txt`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to fetch server logs', true)
+    } finally {
+      logServerBtn.disabled = false
+      logServerBtn.textContent = 'Server logs'
+    }
   })
 }
