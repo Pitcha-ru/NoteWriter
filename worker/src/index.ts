@@ -11,7 +11,7 @@ import { handleAdminRequest } from './admin'
 import { writeLog, getLogs } from './device-log'
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url)
     const path = url.pathname
 
@@ -39,7 +39,7 @@ export default {
       }
     }
 
-    const response = await handleRequest(request, env, path, url)
+    const response = await handleRequest(request, env, ctx, path, url)
     // See comment above — wildcard is acceptable for this WebView-only API.
     response.headers.set('Access-Control-Allow-Origin', '*')
     return response
@@ -48,7 +48,7 @@ export default {
 
 const VALID_LANGS = new Set(['auto', 'en', 'el', 'fr', 'de', 'ru'])
 
-async function handleRequest(request: Request, env: Env, path: string, url: URL): Promise<Response> {
+async function handleRequest(request: Request, env: Env, ctx: ExecutionContext, path: string, url: URL): Promise<Response> {
   // Fix 7: Fail fast if ENCRYPTION_KEY is not configured.
   if (!env.ENCRYPTION_KEY) {
     return json({ error: 'Server configuration error' }, 500)
@@ -65,7 +65,7 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
       return json({ error: result.error }, 409)
     }
     // Log after registration (device_id is the identifier here, not a token-auth'd deviceId)
-    void writeLog(body.device_id, { event: 'register', data: { ok: true }, status: 201 }, env.DB)
+    ctx.waitUntil(writeLog(body.device_id, { event: 'register', data: { ok: true }, status: 201 }, env.DB))
     return json({ token: result.token }, 201)
   }
 
@@ -112,12 +112,12 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
       if (body.aws_secret_access_key) saved.push('aws_secret')
       if (body.aws_region) saved.push('aws_region')
       if (body.openai_key) saved.push('openai')
-      void writeLog(deviceId, { event: 'keys_save', data: { fields: saved }, status: 200 }, env.DB)
+      ctx.waitUntil(writeLog(deviceId, { event: 'keys_save', data: { fields: saved }, status: 200 }, env.DB))
       return json({ ok: true })
     }
     if (request.method === 'DELETE') {
       await deleteKeys(deviceId, env.KV)
-      void writeLog(deviceId, { event: 'keys_delete', status: 200 }, env.DB)
+      ctx.waitUntil(writeLog(deviceId, { event: 'keys_delete', status: 200 }, env.DB))
       return json({ ok: true })
     }
   }
@@ -144,7 +144,7 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
       }
       const result = await updateSettings(deviceId, body, env.DB)
       if (result.error) return json({ error: result.error }, 400)
-      void writeLog(deviceId, { event: 'settings_save', data: { listen_lang: body.listen_lang, translate_lang: body.translate_lang, translate_provider: body.translate_provider, translate_model: body.translate_model }, status: 200 }, env.DB)
+      ctx.waitUntil(writeLog(deviceId, { event: 'settings_save', data: { listen_lang: body.listen_lang, translate_lang: body.translate_lang, translate_provider: body.translate_provider, translate_model: body.translate_model }, status: 200 }, env.DB))
       return json({ ok: true })
     }
   }
@@ -154,15 +154,15 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
     const t0 = Date.now()
     const keys = await getCachedKeys(deviceId, env.KV, env.ENCRYPTION_KEY)
     if (!keys?.elevenlabs_key) {
-      void writeLog(deviceId, { event: 'stt_token', data: { error: 'key_not_configured' }, status: 400 }, env.DB)
+      ctx.waitUntil(writeLog(deviceId, { event: 'stt_token', data: { error: 'key_not_configured' }, status: 400 }, env.DB))
       return json({ error: 'ElevenLabs key not configured' }, 400)
     }
     const result = await mintSttToken(keys.elevenlabs_key, env.ELEVENLABS_API_BASE)
     if ('error' in result) {
-      void writeLog(deviceId, { event: 'stt_token', data: { error: result.error }, duration_ms: Date.now() - t0, status: 502 }, env.DB)
+      ctx.waitUntil(writeLog(deviceId, { event: 'stt_token', data: { error: result.error }, duration_ms: Date.now() - t0, status: 502 }, env.DB))
       return json({ error: result.error }, 502)
     }
-    void writeLog(deviceId, { event: 'stt_token', data: { ok: true }, duration_ms: Date.now() - t0, status: 200 }, env.DB)
+    ctx.waitUntil(writeLog(deviceId, { event: 'stt_token', data: { ok: true }, duration_ms: Date.now() - t0, status: 200 }, env.DB))
     return json({ token: result.token })
   }
 
@@ -193,11 +193,11 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
       } else {
         translated = await translateText(body.text, body.source_lang, body.target_lang, keys.aws_access_key_id, keys.aws_secret_access_key, keys.aws_region)
       }
-      void writeLog(deviceId, { event: 'translate', data: logData, duration_ms: Date.now() - t0, status: 200 }, env.DB)
+      ctx.waitUntil(writeLog(deviceId, { event: 'translate', data: logData, duration_ms: Date.now() - t0, status: 200 }, env.DB))
       return json({ translated_text: translated })
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Translation failed'
-      void writeLog(deviceId, { event: 'translate', data: { ...logData, error: errMsg }, duration_ms: Date.now() - t0, status: 502 }, env.DB)
+      ctx.waitUntil(writeLog(deviceId, { event: 'translate', data: { ...logData, error: errMsg }, duration_ms: Date.now() - t0, status: 502 }, env.DB))
       return json({ error: errMsg }, 502)
     }
   }
@@ -217,16 +217,16 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
       const streamResponse = await streamDialogueResponse(openaiMessages, keys.openai_key)
       if (!streamResponse.ok) {
         const err = await streamResponse.text()
-        void writeLog(deviceId, { event: 'dialogue', data: { error: `openai_${streamResponse.status}`, msg_count: body.messages.length }, duration_ms: Date.now() - t0, status: 502 }, env.DB)
+        ctx.waitUntil(writeLog(deviceId, { event: 'dialogue', data: { error: `openai_${streamResponse.status}`, msg_count: body.messages.length }, duration_ms: Date.now() - t0, status: 502 }, env.DB))
         return json({ error: `OpenAI error (${streamResponse.status}): ${err.slice(0, 200)}` }, 502)
       }
-      void writeLog(deviceId, { event: 'dialogue', data: { msg_count: body.messages.length, source_lang: body.source_lang, target_lang: body.target_lang }, duration_ms: Date.now() - t0, status: 200 }, env.DB)
+      ctx.waitUntil(writeLog(deviceId, { event: 'dialogue', data: { msg_count: body.messages.length, source_lang: body.source_lang, target_lang: body.target_lang }, duration_ms: Date.now() - t0, status: 200 }, env.DB))
       return new Response(streamResponse.body, {
         headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' },
       })
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Generation failed'
-      void writeLog(deviceId, { event: 'dialogue', data: { error: errMsg }, duration_ms: Date.now() - t0, status: 502 }, env.DB)
+      ctx.waitUntil(writeLog(deviceId, { event: 'dialogue', data: { error: errMsg }, duration_ms: Date.now() - t0, status: 502 }, env.DB))
       return json({ error: errMsg }, 502)
     }
   }
@@ -303,7 +303,7 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
         return json({ error: 'Invalid language. Allowed: en, el, fr, de, ru' }, 400)
       }
       const session = await createSession(deviceId, body.listen_lang, body.translate_lang, env.DB, body.mode ?? 'listen')
-      void writeLog(deviceId, { event: 'session_create', data: { session_id: session.id, listen_lang: body.listen_lang, translate_lang: body.translate_lang, mode: body.mode ?? 'listen' }, status: 201 }, env.DB)
+      ctx.waitUntil(writeLog(deviceId, { event: 'session_create', data: { session_id: session.id, listen_lang: body.listen_lang, translate_lang: body.translate_lang, mode: body.mode ?? 'listen' }, status: 201 }, env.DB))
       return json(session, 201)
     }
   }
@@ -326,7 +326,7 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
       try {
         const paragraph = await appendParagraph(sessionId, deviceId, body.original, body.translation, env.DB)
         if (!paragraph) return json({ error: 'Session not found' }, 404)
-        void writeLog(deviceId, { event: 'session_append', data: { session_id: sessionId, text_len: body.original.length, has_translation: !!body.translation }, duration_ms: Date.now() - t0, status: 201 }, env.DB)
+        ctx.waitUntil(writeLog(deviceId, { event: 'session_append', data: { session_id: sessionId, text_len: body.original.length, has_translation: !!body.translation }, duration_ms: Date.now() - t0, status: 201 }, env.DB))
         return json(paragraph, 201)
       } catch (err) {
         if (err instanceof Error && err.message.includes('UNIQUE')) {
@@ -338,7 +338,7 @@ async function handleRequest(request: Request, env: Env, path: string, url: URL)
     if (request.method === 'DELETE') {
       const deleted = await deleteSession(sessionId, deviceId, env.DB)
       if (!deleted) return json({ error: 'Session not found' }, 404)
-      void writeLog(deviceId, { event: 'session_delete', data: { session_id: sessionId }, status: 200 }, env.DB)
+      ctx.waitUntil(writeLog(deviceId, { event: 'session_delete', data: { session_id: sessionId }, status: 200 }, env.DB))
       return json({ ok: true })
     }
   }
