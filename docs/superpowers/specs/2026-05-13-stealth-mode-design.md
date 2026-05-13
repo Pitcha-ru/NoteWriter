@@ -31,12 +31,12 @@ New file, structurally similar to `listen.ts`.
 
 | Event | Active state | Paused state |
 |-------|-------------|-------------|
-| Click (0) | → paused: `audioControl(false)`, STT disconnect | → active: reconnect STT, `audioControl(true)` |
-| Double-click (3) | fire-and-forget `api.finalizeSession(sessionId)`, then `onBack()` | fire-and-forget `api.finalizeSession(sessionId)`, then `onBack()` |
+| Click (0) | → paused: `audioControl(false)`, STT disconnect | → active: fetch fresh STT token, reconnect STT, `audioControl(true)` |
+| Double-click (3) | await saveQueue drain, fire-and-forget `api.finalizeSession(sessionId)`, then `onBack()` | same |
 
-Double-click exits from **any** state (same behaviour as Listen). This is intentional — the user accepting accidental exits in exchange for a simpler interaction model.
+Double-click exits from **any** state (same behaviour as Listen). Intentional — simpler interaction model.
 
-If STT reconnect fails on resume, show a brief error line (e.g. `! Error\nClick retry`) and stay in paused state, mirroring Listen's error recovery pattern.
+If STT reconnect fails on resume, show `! Error\nClick retry` and stay paused — mirroring Listen's error recovery.
 
 ### STT Configuration
 
@@ -46,7 +46,10 @@ Same as Listen (`scribe_v2_realtime`, PCM 16000, VAD commit strategy) with one c
 ### Session Handling
 
 - Create session with `mode: 'stealth'`
-- On each `committedTranscript`: call `api.appendParagraph(sessionId, text, '')` — save original only, no translation
+- Dispatch `notewriter:session-created` after session creation (same as Listen — phone UI needs this to refresh)
+- Use `saveQueue` / `enqueueSave` pattern (same as `listen.ts`) — ensures paragraphs are written to the server in order
+- On each `committedTranscript`: filter with `isNoise()` (same as Listen — discard `(applause)`, `[music]`, etc.), then enqueue `api.appendParagraph(sessionId, text, '')` — original only, no translation
+- Dispatch `notewriter:session-updated` after each successful paragraph save (same as Listen)
 - No translation during the session
 
 ### Exports
@@ -54,8 +57,8 @@ Same as Listen (`scribe_v2_realtime`, PCM 16000, VAD commit strategy) with one c
 `stealth.ts` exports:
 - `startStealth(bridge, api)` — entry point
 - `handleStealthEvent(bridge, eventType, api, onBack)` — button/gesture handler
-- `handleStealthAudio(pcmData)` — audio packet handler (checks internal state, ignores packets when paused)
-- `resetStealth()` — full teardown, called by `resetAll()` in main.ts
+- `handleStealthAudio(pcmData)` — audio packet handler; must guard with `if (stealthState !== 'active') return` at the top
+- `resetStealth()` — full teardown: stop indicator timer, call `audioControl(false)`, disconnect STT, set `appState.currentSessionId = null`. Called by `resetAll()` in main.ts.
 
 ## Menu — src/glasses/menu.ts
 
@@ -65,32 +68,44 @@ Insert `'Stealth'` as the second item:
 ['Listen', 'Stealth', 'Dialogue', 'Notes', 'History', 'Settings']
 ```
 
-- Stealth requires `keysConfigured` (same as Listen); shows `(setup keys first)` otherwise
-- All `case` indices in `handleMenuEvent` shift by 1 for items after Listen
+**Guard:** Stealth requires `keysConfigured` (same as Listen — ElevenLabs + translate keys required, since translate runs server-side at session end). Shows `(setup keys first)` otherwise.
+
+**Index shift** — update `handleMenuEvent` cases:
+
+| Index | Item | Guard |
+|-------|------|-------|
+| 0 | Listen | `keysConfigured` |
+| 1 | Stealth | `keysConfigured` |
+| 2 | Dialogue | `keysConfigured && openaiKeyConfigured` |
+| 3 | Notes | none |
+| 4 | History | none |
+| 5 | Settings | none |
+
+Note: index 1 previously was Dialogue (`keysConfigured && openaiKeyConfigured`). The new case 1 guard is `keysConfigured` only.
+
+**Callback type:** Add `onStealth: () => void` to the `callbacks` inline type in `handleMenuEvent`'s signature in `menu.ts`.
 
 ## main.ts
 
-Add `onStealth` callback in `handleMenuEvent` call. Wire up:
-- `startStealth(bridge, api)` on menu select
-- `handleStealthEvent(bridge, eventType, api, onBack)` on bridge events
-- Audio routing: the bridge `onAudioData` handler calls `handleAudioData` (Listen) **and** `handleStealthAudio` (Stealth) unconditionally — each handler's internal state guard ignores packets when its mode is inactive. This is the existing pattern; do NOT use `appState.currentScreen` for routing.
-- Add `resetStealth()` to the existing `resetAll()` function alongside `resetListen()` and `resetDialogue()`
+- Wrap `startStealth` call in `navigateWithGuard(...)` — same as all other mode transitions; without it, ghost-click suppression doesn't fire
+- Add `onStealth: () => navigateWithGuard(() => startStealth(bridge, api))` to the `handleMenuEvent` callbacks object
+- Audio routing: call `handleStealthAudio(pcmData)` unconditionally alongside `handleAudioData` — each handler guards itself internally
+- Add `resetStealth()` to `resetAll()`
+- Add `case 'stealth': handleStealthEvent(...); break` to the `switch (appState.currentScreen)` block
 
 ## Types to update
 
 ### src/services/state.ts — `Screen` union type
-
-Add `'stealth'` to the `Screen` type so `appState.navigateTo('stealth')` compiles.
+Add `'stealth'` so `appState.navigateTo('stealth')` compiles.
 
 ### worker/src/sessions.ts — `Session` interface
-
-Add `mode: string` field so the finalize handler can read it from the DB row.
+Add `mode: string` field so the finalize handler can read the session row at the TypeScript level.
 
 ## Worker — POST /api/sessions/:id/finalize
 
-New route in the Cloudflare Worker (`index.ts`).
+New route in `worker/src/index.ts`.
 
-**Routing:** Add a specific regex **before** the general `sessionMatch`:
+**Routing:** Add a specific regex **before** the general `sessionMatch` block:
 ```ts
 const finalizeMatch = path.match(/^\/api\/sessions\/([^/]+)\/finalize$/)
 if (finalizeMatch && request.method === 'POST') { ... }
@@ -98,19 +113,20 @@ if (finalizeMatch && request.method === 'POST') { ... }
 
 **Request:** `POST /api/sessions/:id/finalize` (auth required, body empty)
 
-**Response:** `200 {}` immediately
-
-**Background work (ctx.waitUntil):**
+**Synchronous part (before response):**
 1. Verify session exists and belongs to `deviceId` — return 404 if not
-2. Return `200 {}` to client
-3. Inside `waitUntil`: fetch all paragraphs where `translation = ''`
-4. Fetch user settings (`translate_provider`, `translate_model`) and API keys from KV
-5. If keys are missing, write a log entry and exit — no silent failure
-6. For each paragraph, call `translateText` (Amazon) or `translateWithOpenAI` (OpenAI) based on settings
-7. Save each result via `updateParagraphTranslation`
-8. Per-paragraph errors are logged and skipped — partial success is acceptable; re-calling finalize is safe because the `WHERE translation = ''` filter skips already-translated paragraphs
+2. Return `200 {}` immediately
 
-**Race condition note:** Client fires `appendParagraph` then `finalizeSession` sequentially. The finalize HTTP call is fire-and-forget (client doesn't await), so both may be in-flight simultaneously. The `WHERE translation = ''` fetch in the background task may run before the last `appendParagraph` commits. Mitigation: the late-arriving paragraph simply has no translation in that finalize run. The user can trigger a second finalize by opening and immediately closing Stealth again if needed. This edge case affects at most the last 1–2 paragraphs and is acceptable.
+**Background work (ctx.waitUntil) — runs after response is sent:**
+3. Fetch all paragraphs where `(translation IS NULL OR translation = '')`
+4. Fetch user settings via `getSettings(deviceId, env.DB)` — read `translate_provider` and `translate_model`
+5. Fetch API keys via `getCachedKeys(deviceId, env.KV, env.ENCRYPTION_KEY)` (same as translate route)
+6. If keys are missing, write a log entry and exit — no silent failure
+7. For each paragraph, call `translateText` (Amazon) or `translateWithOpenAI` (OpenAI) based on settings
+8. Save each result via `updateParagraphTranslation`
+9. Per-paragraph errors are logged and skipped; re-calling finalize is safe (already-translated paragraphs are skipped by the predicate)
+
+**Race condition note:** Client awaits the `saveQueue` before firing `finalizeSession`, minimising the window. Any paragraph that still slips through has no translation in this run; re-calling finalize (open+close Stealth) recovers it. Acceptable edge case.
 
 ## ApiClient — src/services/api.ts
 
@@ -131,15 +147,13 @@ Add two higher-quality translation models to the existing OpenAI model selector 
 - `gpt-4.1` — GPT-4.1
 - `o4-mini` — O4 Mini
 
-No other phone UI changes needed.
-
 ## History
 
-### Glasses History — no changes needed
+### Glasses History — no changes
 `formatHistoryDetail` renders original-only when `translation` is empty. Displays cleanly while finalize is pending.
 
-### Phone History — src/phone/history.ts — one change required
-`renderParagraph` (lines 172-185) auto-translates any paragraph with an empty translation and calls `api.updateParagraphTranslation` on the result. For Stealth sessions opened before finalize completes, this fires N concurrent translate calls from the phone — duplicating finalize work and charging the API key twice.
+### Phone History — src/phone/history.ts — one change
+`renderParagraph` (lines 172-185) auto-translates paragraphs with empty translations and calls `api.updateParagraphTranslation`. For Stealth sessions opened before finalize completes, this fires N concurrent translate calls from the phone, duplicating finalize work and charging the API key twice.
 
 Fix: skip auto-translate when session mode is `'stealth'`:
 ```ts
@@ -147,26 +161,23 @@ if (!para.translation && para.original && lastSession?.mode !== 'stealth') {
   // existing auto-translate logic
 }
 ```
-While finalize is pending, Stealth paragraphs show the existing `"Translating…"` italic placeholder — correct behaviour.
 
-## main.ts — additional changes
+`lastSession` is set in `openSession` before `renderParagraph` is called — the guard is always evaluated with the correct session. `mode` is returned as-is by the list API (`SELECT *` includes the column; no rename needed via `toCamel`). The client `Session` type in `types.ts` already has `mode?: string`.
 
-### Switch statement
-The event-dispatch `switch (appState.currentScreen)` (lines 166-187) needs a `case 'stealth':` branch:
+## main.ts — switch statement
+
+The `switch (appState.currentScreen)` event-dispatch block needs a `case 'stealth':` branch:
 ```ts
 case 'stealth': handleStealthEvent(bridge, eventType, api, () => navigateWithGuard(() => { resetAll(); showMenu(bridge) })); break
 ```
 Without it, button events on the stealth screen are silently ignored.
 
-### currentSessionId
-`appState.currentSessionId` is set by `startStealth` but never cleared. `resetStealth()` must set `appState.currentSessionId = null` (or equivalent) to prevent leaking into the next session.
-
 ## D1 Schema
 
-No new migration needed. The `mode` column was already added to the `sessions` table in an earlier migration (`0002_dialogue.sql`). Verify it exists before writing the finalize handler.
+No new migration needed. The `mode` column was added to `sessions` in `0002_dialogue.sql`. Verify before writing the finalize handler.
 
 ## Out of Scope
 
-- Batch translation API endpoint (single-paragraph translation reused per-paragraph in finalize)
+- Batch translation API endpoint
 - Separate Stealth-specific translation model setting (uses global settings)
 - Phone UI indicator for in-progress server translation
