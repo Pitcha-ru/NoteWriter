@@ -1,6 +1,6 @@
 import { log } from './logger'
 
-export interface SttConfig { language: string }
+export interface SttConfig { language: string; vadSilenceThresholdSecs?: string }
 type TranscriptCallback = (text: string) => void
 type StatusCallback = (status: string) => void
 type ErrorCallback = (error: Error) => void
@@ -82,7 +82,7 @@ export class SttClient {
       token: this.token,
       audio_format: 'pcm_16000',
       commit_strategy: 'vad',
-      vad_silence_threshold_secs: '0.5',
+      vad_silence_threshold_secs: this.config.vadSilenceThresholdSecs ?? '0.5',
     })
     if (this.config.language && this.config.language !== 'auto') {
       params.set('language_code', this.config.language)
