@@ -256,6 +256,17 @@
     }
 
     .warning-msg.show { display: block; }
+
+    /* ── Key status ──────────────────────────────────────────── */
+    .key-status {
+      font-size: 12px;
+      color: #8e8e93;
+      margin-top: 6px;
+    }
+
+    .key-status.saved {
+      color: #34c759;
+    }
   </style>
 </head>
 <body>
@@ -286,21 +297,53 @@
         <div class="field">
           <label for="key-elevenlabs">ElevenLabs API Key</label>
           <input type="password" id="key-elevenlabs" autocomplete="off" autocorrect="off" spellcheck="false" />
+          <div id="status-elevenlabs" class="key-status"></div>
         </div>
+
+        <div class="field">
+          <label for="key-openai">OpenAI API Key</label>
+          <input type="password" id="key-openai" autocomplete="off" autocorrect="off" spellcheck="false" />
+          <div id="status-openai" class="key-status"></div>
+        </div>
+
+        <div class="field">
+          <label for="keys-translate-provider">Translation Provider</label>
+          <select id="keys-translate-provider">
+            <option value="amazon">Amazon Translate</option>
+            <option value="openai">OpenAI</option>
+          </select>
+        </div>
+
+        <div class="field" id="keys-translate-model-field" style="display:none">
+          <label for="keys-translate-model">Translation Model</label>
+          <select id="keys-translate-model">
+            <option value="gpt-4o-mini">GPT-4o Mini</option>
+            <option value="gpt-4.1-nano">GPT-4.1 Nano</option>
+            <option value="gpt-4.1">GPT-4.1</option>
+            <option value="o4-mini">O4 Mini</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card" id="keys-aws-card" style="display:block">
+        <div class="card-title">AWS Credentials</div>
 
         <div class="field">
           <label for="key-aws-access">AWS Access Key ID</label>
           <input type="password" id="key-aws-access" autocomplete="off" autocorrect="off" spellcheck="false" />
+          <div id="status-aws-access" class="key-status"></div>
         </div>
 
         <div class="field">
           <label for="key-aws-secret">AWS Secret Access Key</label>
           <input type="password" id="key-aws-secret" autocomplete="off" autocorrect="off" spellcheck="false" />
+          <div id="status-aws-secret" class="key-status"></div>
         </div>
 
         <div class="field">
           <label for="key-aws-region">AWS Region</label>
           <input type="text" id="key-aws-region" placeholder="e.g. us-east-1" autocomplete="off" autocorrect="off" spellcheck="false" />
+          <div id="status-aws-region" class="key-status"></div>
         </div>
       </div>
 
