@@ -36,7 +36,7 @@ function updateDisplay(): void {
     setMenuContent(currentBridge, '‖')
     return
   }
-  const dot = indicatorFrame % 2 === 0 ? '●' : ' '
+  const dot = indicatorFrame % 2 === 0 ? '·' : ' '
   setMenuContent(currentBridge, dot)
 }
 
