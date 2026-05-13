@@ -61,9 +61,11 @@ async function init() {
   window.addEventListener('notewriter:keys-changed', async () => {
     try {
       const k = await api.getKeys()
-      appState.setKeysConfigured(k.elevenlabsKey !== null && k.awsAccessKeyId !== null)
+      const hasElevenlabs = k.elevenlabsKey !== null
+      const provider = appState.settings.translateProvider
+      const hasTranslateKeys = provider === 'openai' ? k.openaiKey !== null : k.awsAccessKeyId !== null
+      appState.setKeysConfigured(hasElevenlabs && hasTranslateKeys)
       appState.openaiKeyConfigured = k.openaiKey !== null
-      // Refresh menu if we're on it (to update Listen/Dialogue availability)
       if (appState.currentScreen === 'menu') showMenu(bridge)
     } catch {}
   })
