@@ -14,6 +14,7 @@ let currentApi: ApiClient | null = null
 let indicatorTimer: ReturnType<typeof setInterval> | null = null
 let indicatorFrame = 0
 let saveQueue: Promise<any> = Promise.resolve()
+let isResuming = false
 
 function enqueueSave(fn: () => Promise<any>): void {
   saveQueue = saveQueue.then(fn, fn)
@@ -64,7 +65,9 @@ function pauseStealth(): void {
 }
 
 async function resumeStealth(): Promise<void> {
-  if (!currentBridge || !currentApi) return
+  if (isResuming || !currentBridge || !currentApi) return
+  isResuming = true
+
   log('STEALTH', 'Resuming')
   stealthState = 'active'
 
@@ -90,7 +93,7 @@ async function resumeStealth(): Promise<void> {
     })
 
     sttClient.onPartialTranscript(() => {}) // discard — no display
-    sttClient.onError(() => {})
+    sttClient.onError((e) => log('ERR', `Stealth STT error: ${e.message}`))
     sttClient.onStatus(() => {})
 
     sttClient.connect()
@@ -102,6 +105,8 @@ async function resumeStealth(): Promise<void> {
     log('ERR', `Stealth resume failed: ${msg}`)
     stealthState = 'paused'
     setMenuContent(currentBridge, `! Error\nClick retry`)
+  } finally {
+    isResuming = false
   }
 }
 
@@ -113,6 +118,7 @@ export function resetStealth(): void {
   sttClient?.disconnect()
   sttClient = null
   stealthState = 'active'
+  isResuming = false
   indicatorFrame = 0
   saveQueue = Promise.resolve()
   appState.currentSessionId = null
@@ -159,7 +165,7 @@ export async function startStealth(bridge: any, api: ApiClient): Promise<void> {
     })
 
     sttClient.onPartialTranscript(() => {})
-    sttClient.onError(() => {})
+    sttClient.onError((e) => log('ERR', `Stealth STT error: ${e.message}`))
     sttClient.onStatus(() => {})
 
     sttClient.connect()
