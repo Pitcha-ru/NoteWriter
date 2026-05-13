@@ -169,8 +169,8 @@ export function initHistory(api: ApiClient, showToast: ShowToast): void {
       <div class="para-translation" data-para-id="${escapeHtml(para.id)}">${translationHtml}</div>
     `
 
-    // If translation is empty, translate on the fly
-    if (!para.translation && para.original) {
+    // Skip auto-translate for stealth sessions — server finalize handles it
+    if (!para.translation && para.original && lastSession?.mode !== 'stealth') {
       api.translate(para.original, 'auto', lastSession?.translateLang ?? 'en')
         .then((translated) => {
           const el = div.querySelector('.para-translation')
