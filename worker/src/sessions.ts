@@ -5,6 +5,7 @@ export interface Session {
   listen_lang: string
   translate_lang: string
   preview: string | null
+  mode: string
 }
 
 export interface Paragraph {
