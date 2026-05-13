@@ -4,6 +4,7 @@ import { ApiClient } from './services/api'
 import { showMenu, handleMenuEvent } from './glasses/menu'
 import { startListening, handleListenEvent, handleAudioData, resetListen } from './glasses/listen'
 import { startDialogue, handleDialogueEvent, handleDialogueAudio, resetDialogue } from './glasses/dialogue'
+import { startStealth, handleStealthEvent, handleStealthAudio, resetStealth } from './glasses/stealth'
 import { showHistoryList, handleHistoryListEvent, handleHistoryDetailEvent } from './glasses/history'
 import { showNotesList, handleNotesListEvent, handleNoteDetailEvent } from './glasses/notes'
 import { showSettings, handleSettingsEvent } from './glasses/settings'
@@ -96,6 +97,7 @@ async function init() {
   function resetAll(): void {
     resetListen()
     resetDialogue()
+    resetStealth()
     appState.navigateTo('menu')
   }
 
@@ -127,7 +129,7 @@ async function init() {
   // Event handler
   bridge.onEvenHubEvent((event: any) => {
 
-    if (event.audioEvent?.audioPcm) { handleAudioData(event.audioEvent.audioPcm); handleDialogueAudio(event.audioEvent.audioPcm); return }
+    if (event.audioEvent?.audioPcm) { handleAudioData(event.audioEvent.audioPcm); handleDialogueAudio(event.audioEvent.audioPcm); handleStealthAudio(event.audioEvent.audioPcm); return }
 
     // Parse eventType
     let eventType: number | undefined =
@@ -166,6 +168,7 @@ async function init() {
     switch (appState.currentScreen) {
       case 'menu': handleMenuEvent(bridge, eventType, selectedIndex, {
         onListen: () => navigateWithGuard(() => startListening(bridge, api)),
+        onStealth: () => navigateWithGuard(() => startStealth(bridge, api)),
         onDialogue: () => navigateWithGuard(() => startDialogue(bridge, api)),
         onNotes: () => navigateWithGuard(() => showNotesList(bridge, api)),
         onHistory: () => navigateWithGuard(() => showHistoryList(bridge, api)),
@@ -178,6 +181,7 @@ async function init() {
         },
       }); break
       case 'listen': handleListenEvent(bridge, eventType, api, () => navigateWithGuard(() => { resetAll(); showMenu(bridge) })); break
+      case 'stealth': handleStealthEvent(bridge, eventType, api, () => navigateWithGuard(() => { resetAll(); showMenu(bridge) })); break
       case 'dialogue': handleDialogueEvent(bridge, eventType, api, () => navigateWithGuard(() => { resetAll(); showMenu(bridge) })); break
       case 'notes_list': handleNotesListEvent(bridge, eventType, selectedIndex, api, () => navigateWithGuard(() => showMenu(bridge))); break
       case 'notes_detail': handleNoteDetailEvent(bridge, eventType, api, () => navigateWithGuard(() => showNotesList(bridge, api))); break
