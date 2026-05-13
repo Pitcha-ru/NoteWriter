@@ -176,6 +176,10 @@ export class ApiClient {
     await this.request(`/api/notes/${id}`, { method: 'DELETE' })
   }
 
+  async finalizeSession(id: string): Promise<void> {
+    await this.request<{}>(`/api/sessions/${id}/finalize`, { method: 'POST' })
+  }
+
   async hideNote(id: string): Promise<void> {
     await this.request(`/api/notes/${id}/hide`, { method: 'POST' })
   }

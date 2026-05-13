@@ -5,7 +5,7 @@ describe('ApiClient', () => {
   let client: ApiClient
   beforeEach(() => {
     client = new ApiClient('https://worker.example.com')
-    global.fetch = vi.fn()
+    vi.stubGlobal('fetch', vi.fn())
   })
 
   it('register sends device_id and returns token', async () => {
@@ -27,5 +27,15 @@ describe('ApiClient', () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ listenLang: 'en', translateLang: 'el' })))
     await client.getSettings()
     expect(fetch).toHaveBeenCalledWith('https://worker.example.com/api/settings', expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer mytoken' }) }))
+  })
+
+  it('finalizeSession POSTs to finalize endpoint', async () => {
+    client.setToken('tok')
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }))
+    await client.finalizeSession('session-123')
+    expect(fetch).toHaveBeenCalledWith(
+      'https://worker.example.com/api/sessions/session-123/finalize',
+      expect.objectContaining({ method: 'POST' })
+    )
   })
 })
