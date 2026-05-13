@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createSession, listSessions, appendParagraph, deleteSession } from '../sessions'
 import type { Session, Paragraph } from '../sessions'
+import worker from '../index'
 
 function createMockD1() {
   const sessions: Map<string, Session> = new Map()
@@ -258,5 +259,236 @@ describe('sessions (behavioral)', () => {
       const { sessions } = await listSessions('device-1', null, 10, db)
       expect(sessions).toHaveLength(0)
     })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Integration tests for /api/sessions/:id/finalize via worker.fetch
+// ---------------------------------------------------------------------------
+
+function createFullMockD1() {
+  const devices: Map<string, { id: string; token_hash: string }> = new Map()
+  const settingsMap: Map<string, { listen_lang: string; translate_lang: string; context: string; persona: string; translate_provider: string; translate_model: string }> = new Map()
+  const sessions: Map<string, Session> = new Map()
+  const paragraphs: Map<string, Paragraph> = new Map()
+
+  function getSessionParagraphs(sessionId: string): Paragraph[] {
+    return Array.from(paragraphs.values()).filter(p => p.session_id === sessionId)
+  }
+
+  return {
+    prepare(query: string) {
+      const q = query.trim().replace(/\s+/g, ' ').toUpperCase()
+      return {
+        bind(...args: unknown[]) {
+          return {
+            async first<T = unknown>(): Promise<T | null> {
+              // Device lookup by token_hash
+              if (q.includes('SELECT') && q.includes('DEVICES') && q.includes('TOKEN_HASH = ?')) {
+                for (const device of devices.values()) {
+                  if (device.token_hash === args[0]) return { id: device.id } as T
+                }
+                return null
+              }
+              // Device lookup by id
+              if (q.includes('SELECT') && q.includes('DEVICES WHERE ID = ?')) {
+                return (devices.get(args[0] as string) ?? null) as T | null
+              }
+              // Session by id + device_id
+              if (q.startsWith('SELECT * FROM SESSIONS WHERE ID = ? AND DEVICE_ID = ?')) {
+                const [id, deviceId] = args as string[]
+                const s = sessions.get(id)
+                return (s && s.device_id === deviceId ? s : null) as T | null
+              }
+              // Session by id only
+              if (q.startsWith('SELECT * FROM SESSIONS WHERE ID = ?')) {
+                return (sessions.get(args[0] as string) ?? null) as T | null
+              }
+              // Session ownership check (SELECT ID FROM sessions WHERE id = ? AND device_id = ?)
+              if (q.startsWith('SELECT ID FROM SESSIONS WHERE ID = ? AND DEVICE_ID = ?')) {
+                const [id, deviceId] = args as string[]
+                const s = sessions.get(id)
+                return (s && s.device_id === deviceId ? { id: s.id } : null) as T | null
+              }
+              // Paragraph position
+              if (q.startsWith('SELECT POSITION FROM PARAGRAPHS WHERE ID = ?')) {
+                const p = paragraphs.get(args[0] as string)
+                return (p ? { position: p.position } : null) as T | null
+              }
+              // Settings
+              if (q.includes('SELECT') && q.includes('SETTINGS') && q.includes('DEVICE_ID = ?')) {
+                const s = settingsMap.get(args[0] as string)
+                return (s ?? null) as T | null
+              }
+              return null
+            },
+
+            async all<T = unknown>(): Promise<{ results: T[] }> {
+              // Sessions for device
+              if (q.startsWith('SELECT * FROM SESSIONS WHERE DEVICE_ID = ?')) {
+                const deviceId = args[0] as string
+                let filtered = Array.from(sessions.values()).filter(s => s.device_id === deviceId)
+                if (q.includes('CREATED_AT < ?')) {
+                  const cursorCreatedAt = args[1] as string
+                  const cursorId = args[3] as string
+                  filtered = filtered.filter(s =>
+                    s.created_at < cursorCreatedAt ||
+                    (s.created_at === cursorCreatedAt && s.id < cursorId)
+                  )
+                }
+                filtered.sort((a, b) => {
+                  const cmp = b.created_at.localeCompare(a.created_at)
+                  return cmp !== 0 ? cmp : b.id.localeCompare(a.id)
+                })
+                const limit = args[args.length - 1] as number
+                return { results: filtered.slice(0, limit) as unknown as T[] }
+              }
+              // Paragraphs for session
+              if (q.startsWith('SELECT * FROM PARAGRAPHS WHERE SESSION_ID = ?')) {
+                const sessionId = args[0] as string
+                let ps = getSessionParagraphs(sessionId)
+                if (q.includes('POSITION > ?')) {
+                  const cursor = args[1] as number
+                  ps = ps.filter(p => p.position > cursor)
+                }
+                ps.sort((a, b) => a.position - b.position)
+                const limit = args[args.length - 1] as number
+                return { results: ps.slice(0, limit) as unknown as T[] }
+              }
+              // Untranslated paragraphs for finalize
+              if (q.includes('SELECT') && q.includes('PARAGRAPHS') && q.includes('SESSION_ID = ?') && q.includes('TRANSLATION')) {
+                const sessionId = args[0] as string
+                const ps = getSessionParagraphs(sessionId).filter(p => !p.translation)
+                return { results: ps as unknown as T[] }
+              }
+              return { results: [] }
+            },
+
+            async run(): Promise<{ meta: { changes: number } }> {
+              // Device insert
+              if (q.startsWith('INSERT INTO DEVICES')) {
+                devices.set(args[0] as string, { id: args[0] as string, token_hash: args[1] as string })
+                return { meta: { changes: 1 } }
+              }
+              // Settings insert
+              if (q.startsWith('INSERT INTO SETTINGS')) {
+                settingsMap.set(args[0] as string, { listen_lang: 'en', translate_lang: 'el', context: '', persona: '', translate_provider: 'amazon', translate_model: 'gpt-4o-mini' })
+                return { meta: { changes: 1 } }
+              }
+              // Session insert
+              if (q.startsWith('INSERT INTO SESSIONS')) {
+                const [id, device_id, listen_lang, translate_lang, mode] = args as string[]
+                sessions.set(id, { id, device_id, listen_lang, translate_lang, created_at: new Date().toISOString(), preview: null, mode: mode ?? 'listen' })
+                return { meta: { changes: 1 } }
+              }
+              // Paragraph insert
+              if (q.startsWith('INSERT INTO PARAGRAPHS') && q.includes('COALESCE')) {
+                const [id, session_id, original, translation] = args as string[]
+                const ps = getSessionParagraphs(session_id)
+                const maxPos = ps.length > 0 ? Math.max(...ps.map(p => p.position)) : -1
+                paragraphs.set(id, { id, session_id, position: maxPos + 1, original, translation })
+                return { meta: { changes: 1 } }
+              }
+              // Session preview update
+              if (q.startsWith('UPDATE SESSIONS SET PREVIEW')) {
+                const [preview, id] = args as string[]
+                const s = sessions.get(id)
+                if (s) sessions.set(id, { ...s, preview })
+                return { meta: { changes: 1 } }
+              }
+              // Paragraph translation update
+              if (q.startsWith('UPDATE PARAGRAPHS SET TRANSLATION')) {
+                const [translation, id] = args as string[]
+                const p = paragraphs.get(id)
+                if (p) paragraphs.set(id, { ...p, translation })
+                return { meta: { changes: p ? 1 : 0 } }
+              }
+              // Device log insert — silently succeed
+              if (q.startsWith('INSERT INTO DEVICE_LOGS') || q.includes('DEVICE_LOGS')) {
+                return { meta: { changes: 1 } }
+              }
+              return { meta: { changes: 0 } }
+            },
+          }
+        },
+      }
+    },
+  } as unknown as D1Database
+}
+
+function createMockKV(): KVNamespace {
+  const store: Map<string, string> = new Map()
+  return {
+    async get(key: string) { return store.get(key) ?? null },
+    async put(key: string, value: string) { store.set(key, value) },
+    async delete(key: string) { store.delete(key) },
+    async list() { return { keys: [], list_complete: true, cursor: undefined } },
+    async getWithMetadata(key: string) { return { value: store.get(key) ?? null, metadata: null } },
+  } as unknown as KVNamespace
+}
+
+describe('finalize route (integration)', () => {
+  let env: { DB: D1Database; KV: KVNamespace; ENCRYPTION_KEY: string; ELEVENLABS_API_BASE: string; AWS_TRANSLATE_ENDPOINT: string; ADMIN_PASSWORD: string }
+  let ctx: ExecutionContext
+  let token: string
+
+  beforeEach(async () => {
+    env = {
+      DB: createFullMockD1(),
+      KV: createMockKV(),
+      ENCRYPTION_KEY: 'test-encryption-key-32-chars-long!',
+      ELEVENLABS_API_BASE: 'https://api.elevenlabs.io',
+      AWS_TRANSLATE_ENDPOINT: '',
+      ADMIN_PASSWORD: 'admin',
+    }
+    ctx = {
+      waitUntil(promise: Promise<unknown>) { /* fire and forget in tests */ },
+      passThroughOnException() {},
+    } as unknown as ExecutionContext
+
+    // Register a device and grab the token
+    const regRes = await worker.fetch(
+      new Request('http://example.com/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ device_id: 'test-device' }),
+      }),
+      env, ctx
+    )
+    const regBody = await regRes.json<{ token: string }>()
+    token = regBody.token
+  })
+
+  it('POST /api/sessions/:id/finalize returns 200 immediately', async () => {
+    // Create a session first
+    const createRes = await worker.fetch(
+      new Request('http://example.com/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ listen_lang: 'en', translate_lang: 'el', mode: 'stealth' }),
+      }),
+      env, ctx
+    )
+    const { id } = await createRes.json<{ id: string }>()
+
+    const res = await worker.fetch(
+      new Request(`http://example.com/api/sessions/${id}/finalize`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      env, ctx
+    )
+    expect(res.status).toBe(200)
+  })
+
+  it('POST /api/sessions/:id/finalize returns 404 for unknown session', async () => {
+    const res = await worker.fetch(
+      new Request('http://example.com/api/sessions/nonexistent/finalize', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      env, ctx
+    )
+    expect(res.status).toBe(404)
   })
 })

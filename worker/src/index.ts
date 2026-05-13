@@ -284,6 +284,56 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext, 
     return json({ ok: true })
   }
 
+  // Finalize route — must be before general sessionMatch
+  const finalizeMatch = path.match(/^\/api\/sessions\/([^/]+)\/finalize$/)
+  if (finalizeMatch && request.method === 'POST') {
+    const sessionId = finalizeMatch[1]
+    // Verify ownership synchronously
+    const session = await getSession(sessionId, deviceId, null, 1, env.DB)
+    if (!session) return json({ error: 'Session not found' }, 404)
+
+    // Respond immediately, translate in background
+    ctx.waitUntil((async () => {
+      const paragraphs = await env.DB.prepare(
+        "SELECT id, original FROM paragraphs WHERE session_id = ? AND (translation IS NULL OR translation = '')"
+      ).bind(sessionId).all<{ id: string; original: string }>()
+
+      if (paragraphs.results.length === 0) return
+
+      const settings = await getSettings(deviceId, env.DB)
+      const provider = settings?.translate_provider ?? 'amazon'
+      const model = settings?.translate_model ?? 'gpt-4o-mini'
+      const keys = await getCachedKeys(deviceId, env.KV, env.ENCRYPTION_KEY)
+
+      if (!keys) {
+        ctx.waitUntil(writeLog(deviceId, { event: 'finalize', data: { error: 'keys_not_configured', session_id: sessionId } }, env.DB))
+        return
+      }
+
+      const sourceLang = session.session.listen_lang
+      const targetLang = session.session.translate_lang
+
+      for (const para of paragraphs.results) {
+        try {
+          let translated: string
+          if (provider === 'openai') {
+            if (!keys.openai_key) continue
+            translated = await translateWithOpenAI(para.original, sourceLang, targetLang, keys.openai_key, model)
+          } else {
+            translated = await translateText(para.original, sourceLang, targetLang, keys.aws_access_key_id, keys.aws_secret_access_key, keys.aws_region)
+          }
+          await updateParagraphTranslation(para.id, translated, env.DB)
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e)
+          ctx.waitUntil(writeLog(deviceId, { event: 'finalize_para_err', data: { para_id: para.id, error: msg } }, env.DB))
+        }
+      }
+      ctx.waitUntil(writeLog(deviceId, { event: 'finalize', data: { session_id: sessionId, count: paragraphs.results.length }, status: 200 }, env.DB))
+    })())
+
+    return json({ ok: true })
+  }
+
   // Session routes
   const sessionMatch = path.match(/^\/api\/sessions\/([^/]+)$/)
 
