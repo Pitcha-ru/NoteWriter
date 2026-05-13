@@ -75,7 +75,7 @@ async function resumeStealth(): Promise<void> {
 
   try {
     const { token } = await currentApi.getSttToken()
-    sttClient = new SttClient(token, { language: appState.settings.listenLang, vadSilenceThresholdSecs: '1.5' })
+    sttClient = new SttClient(token, { language: appState.settings.listenLang, vadSilenceThresholdSecs: '0.5' })
 
     sttClient.onCommittedTranscript((text) => {
       if (isNoise(text)) return
@@ -147,7 +147,7 @@ export async function startStealth(bridge: any, api: ApiClient): Promise<void> {
     window.dispatchEvent(new CustomEvent('notewriter:session-created'))
 
     const { token } = await api.getSttToken()
-    sttClient = new SttClient(token, { language: appState.settings.listenLang, vadSilenceThresholdSecs: '1.5' })
+    sttClient = new SttClient(token, { language: appState.settings.listenLang, vadSilenceThresholdSecs: '0.5' })
 
     sttClient.onCommittedTranscript((text) => {
       if (isNoise(text)) return
