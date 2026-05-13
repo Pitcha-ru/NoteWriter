@@ -9,7 +9,7 @@ const DISPLAY_ID = 0
 let notes: Note[] = []
 let listCursorIndex = 0
 let listScrollOffset = 0
-const VISIBLE_ITEMS = 8
+const VISIBLE_ITEMS = 7
 let currentNote: Note | null = null
 let currentContentIndex = 0
 
@@ -31,8 +31,9 @@ function renderNotesList(bridge: any): void {
     const title = n.title || '(untitled)'
     return `${cursor}${title}`
   })
-  const indicator = notes.length > VISIBLE_ITEMS ? `${listCursorIndex + 1}/${notes.length}\n` : ''
-  updateText(bridge, DISPLAY_ID, `${indicator}${lines.join('\n')}`)
+  const indicator = `${listCursorIndex + 1}/${notes.length}`
+  // Use setMenuContent to update top-down (no bottom-up truncation) — same as history list
+  setMenuContent(bridge, `${indicator}\n${lines.join('\n')}`)
 }
 
 export async function showNotesList(bridge: any, api: ApiClient): Promise<void> {
