@@ -135,11 +135,38 @@ No other phone UI changes needed.
 
 ## History
 
-No changes to History display logic. `formatHistoryDetail` already handles empty translations gracefully — paragraphs with no translation show only the original text. Once finalize completes (seconds after session ends), refreshing History shows the translations.
+### Glasses History — no changes needed
+`formatHistoryDetail` renders original-only when `translation` is empty. Displays cleanly while finalize is pending.
+
+### Phone History — src/phone/history.ts — one change required
+`renderParagraph` (lines 172-185) auto-translates any paragraph with an empty translation and calls `api.updateParagraphTranslation` on the result. For Stealth sessions opened before finalize completes, this fires N concurrent translate calls from the phone — duplicating finalize work and charging the API key twice.
+
+Fix: skip auto-translate when session mode is `'stealth'`:
+```ts
+if (!para.translation && para.original && lastSession?.mode !== 'stealth') {
+  // existing auto-translate logic
+}
+```
+While finalize is pending, Stealth paragraphs show the existing `"Translating…"` italic placeholder — correct behaviour.
+
+## main.ts — additional changes
+
+### Switch statement
+The event-dispatch `switch (appState.currentScreen)` (lines 166-187) needs a `case 'stealth':` branch:
+```ts
+case 'stealth': handleStealthEvent(bridge, eventType, api, () => navigateWithGuard(() => { resetAll(); showMenu(bridge) })); break
+```
+Without it, button events on the stealth screen are silently ignored.
+
+### currentSessionId
+`appState.currentSessionId` is set by `startStealth` but never cleared. `resetStealth()` must set `appState.currentSessionId = null` (or equivalent) to prevent leaking into the next session.
+
+## D1 Schema
+
+No new migration needed. The `mode` column was already added to the `sessions` table in an earlier migration (`0002_dialogue.sql`). Verify it exists before writing the finalize handler.
 
 ## Out of Scope
 
 - Batch translation API endpoint (single-paragraph translation reused per-paragraph in finalize)
-- Auto-translate on History read
 - Separate Stealth-specific translation model setting (uses global settings)
 - Phone UI indicator for in-progress server translation
