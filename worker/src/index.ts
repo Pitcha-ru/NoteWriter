@@ -288,9 +288,11 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext, 
   const finalizeMatch = path.match(/^\/api\/sessions\/([^/]+)\/finalize$/)
   if (finalizeMatch && request.method === 'POST') {
     const sessionId = finalizeMatch[1]
-    // Verify ownership synchronously
-    const session = await getSession(sessionId, deviceId, null, 1, env.DB)
-    if (!session) return json({ error: 'Session not found' }, 404)
+    // Verify ownership with a direct query (no paragraph rows needed)
+    const sessionRow = await env.DB.prepare(
+      'SELECT id, listen_lang, translate_lang FROM sessions WHERE id = ? AND device_id = ?'
+    ).bind(sessionId, deviceId).first<{ id: string; listen_lang: string; translate_lang: string }>()
+    if (!sessionRow) return json({ error: 'Session not found' }, 404)
 
     // Respond immediately, translate in background
     ctx.waitUntil((async () => {
@@ -306,12 +308,12 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext, 
       const keys = await getCachedKeys(deviceId, env.KV, env.ENCRYPTION_KEY)
 
       if (!keys) {
-        ctx.waitUntil(writeLog(deviceId, { event: 'finalize', data: { error: 'keys_not_configured', session_id: sessionId } }, env.DB))
+        await writeLog(deviceId, { event: 'finalize', data: { error: 'keys_not_configured', session_id: sessionId } }, env.DB)
         return
       }
 
-      const sourceLang = session.session.listen_lang
-      const targetLang = session.session.translate_lang
+      const sourceLang = sessionRow.listen_lang
+      const targetLang = sessionRow.translate_lang
 
       for (const para of paragraphs.results) {
         try {
@@ -325,10 +327,10 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext, 
           await updateParagraphTranslation(para.id, translated, env.DB)
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e)
-          ctx.waitUntil(writeLog(deviceId, { event: 'finalize_para_err', data: { para_id: para.id, error: msg } }, env.DB))
+          await writeLog(deviceId, { event: 'finalize_para_err', data: { para_id: para.id, error: msg } }, env.DB)
         }
       }
-      ctx.waitUntil(writeLog(deviceId, { event: 'finalize', data: { session_id: sessionId, count: paragraphs.results.length }, status: 200 }, env.DB))
+      await writeLog(deviceId, { event: 'finalize', data: { session_id: sessionId, count: paragraphs.results.length }, status: 200 }, env.DB)
     })())
 
     return json({ ok: true })

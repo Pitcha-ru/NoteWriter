@@ -310,6 +310,12 @@ function createFullMockD1() {
                 const s = sessions.get(id)
                 return (s && s.device_id === deviceId ? { id: s.id } : null) as T | null
               }
+              // Finalize ownership query (SELECT id, listen_lang, translate_lang FROM sessions WHERE id = ? AND device_id = ?)
+              if (q.startsWith('SELECT ID, LISTEN_LANG, TRANSLATE_LANG FROM SESSIONS WHERE ID = ? AND DEVICE_ID = ?')) {
+                const [id, deviceId] = args as string[]
+                const s = sessions.get(id)
+                return (s && s.device_id === deviceId ? { id: s.id, listen_lang: s.listen_lang, translate_lang: s.translate_lang } : null) as T | null
+              }
               // Paragraph position
               if (q.startsWith('SELECT POSITION FROM PARAGRAPHS WHERE ID = ?')) {
                 const p = paragraphs.get(args[0] as string)
