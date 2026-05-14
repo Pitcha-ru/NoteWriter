@@ -106,12 +106,15 @@ export function handleHistoryListEvent(
 // ── Session detail (scroll through paragraphs) ──────────────────────────────
 
 let lastShown = 1 // how many paragraphs were shown on last render
+let currentSubPage = 0 // sub-page within current paragraph (for long paragraphs)
+let lastHasMoreInParagraph = false
 
 function renderParagraph(bridge: any): void {
-  const { text, shown } = formatHistoryDetail(paragraphs, currentParagraphIndex)
+  const { text, shown, hasMoreInParagraph } = formatHistoryDetail(paragraphs, currentParagraphIndex, currentSubPage)
   lastShown = Math.max(shown, 1)
+  lastHasMoreInParagraph = hasMoreInParagraph
   const endIdx = Math.min(currentParagraphIndex + lastShown, paragraphs.length)
-  const indicator = `${currentParagraphIndex + 1}-${endIdx}/${paragraphs.length}`
+  const indicator = `${currentParagraphIndex + 1}-${endIdx}/${paragraphs.length}${hasMoreInParagraph ? '→' : ''}`
   updateText(bridge, DISPLAY_ID, `${indicator}\n${text}`)
 }
 
@@ -137,6 +140,7 @@ export async function showSessionDetail(bridge: any, api: ApiClient, sessionInde
       updateText(bridge, DISPLAY_ID, 'No content in this session.\nDouble-click to go back.')
     } else {
       currentParagraphIndex = 0
+      currentSubPage = 0
       renderParagraph(bridge)
     }
   } catch (e) {
@@ -155,15 +159,23 @@ export function handleHistoryDetailEvent(
     case 3: // DOUBLE_CLICK — back to list
       onBack()
       break
-    case 1: // UP — previous page
-      if (currentParagraphIndex > 0) {
+    case 1: // UP — previous sub-page or previous paragraph
+      if (currentSubPage > 0) {
+        currentSubPage--
+        renderParagraph(bridge)
+      } else if (currentParagraphIndex > 0) {
         currentParagraphIndex = Math.max(0, currentParagraphIndex - lastShown)
+        currentSubPage = 0
         renderParagraph(bridge)
       }
       break
-    case 2: // DOWN — next page
-      if (currentParagraphIndex + lastShown < paragraphs.length) {
+    case 2: // DOWN — next sub-page or next paragraph
+      if (lastHasMoreInParagraph) {
+        currentSubPage++
+        renderParagraph(bridge)
+      } else if (currentParagraphIndex + lastShown < paragraphs.length) {
         currentParagraphIndex += lastShown
+        currentSubPage = 0
         renderParagraph(bridge)
       }
       break

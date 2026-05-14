@@ -273,18 +273,21 @@ function truncateToFit(text: string, maxLines: number): string {
 
 /**
  * Show as many paragraphs as fit on screen starting from currentIndex.
- * Long paragraphs are truncated to fit. Returns formatted text and count shown.
+ * Long paragraphs are shown in sub-page windows (subPage=0,1,2...).
+ * Returns formatted text, count shown, and whether current paragraph has more content.
  */
 export function formatHistoryDetail(
   paragraphs: Array<{ original: string; translation: string }>,
-  currentIndex: number
-): { text: string; shown: number } {
-  if (!paragraphs[currentIndex]) return { text: '', shown: 0 }
+  currentIndex: number,
+  subPage = 0
+): { text: string; shown: number; hasMoreInParagraph: boolean } {
+  if (!paragraphs[currentIndex]) return { text: '', shown: 0, hasMoreInParagraph: false }
 
   const maxContent = MAX_DISPLAY_LINES - 1 // reserve 1 line for page indicator
   const parts: string[] = []
   let linesUsed = 0
   let count = 0
+  let hasMoreInParagraph = false
 
   for (let i = currentIndex; i < paragraphs.length; i++) {
     const p = paragraphs[i]
@@ -294,17 +297,23 @@ export function formatHistoryDetail(
     let orig = p.original
     let trans = p.translation
 
-    // If this is the first item and it's long, truncate to fit screen
     const fullBlock = trans ? `${orig}\n${trans}` : orig
     const fullLines = estimateLines(fullBlock) + (count > 0 ? 1 : 0)
 
     if (linesUsed + fullLines > maxContent) {
-      if (count > 0) break // skip if we already have content
-      // Truncate first (and only) paragraph to fit
-      const linesForOrig = trans ? Math.ceil(remaining / 2) : remaining
+      if (count > 0) break
+      // Long paragraph — show a sub-page window instead of truncating
+      const linesForOrig = trans ? Math.floor(remaining / 2) : remaining
       const linesForTrans = remaining - linesForOrig
-      orig = truncateToFit(orig, linesForOrig)
-      if (trans) trans = truncateToFit(trans, linesForTrans)
+      const charsPerOrig = linesForOrig * CHARS_PER_LINE
+      const charsPerTrans = linesForTrans * CHARS_PER_LINE
+      const origStart = subPage * charsPerOrig
+      const transStart = subPage * charsPerTrans
+      orig = orig.slice(origStart, origStart + charsPerOrig)
+      if (trans) trans = trans.slice(transStart, transStart + charsPerTrans)
+      const p0 = paragraphs[i]
+      hasMoreInParagraph = origStart + charsPerOrig < p0.original.length ||
+        (!!p0.translation && transStart + charsPerTrans < p0.translation.length)
     }
 
     const block = trans ? `${orig}\n${trans}` : orig
@@ -314,7 +323,7 @@ export function formatHistoryDetail(
     count++
   }
 
-  return { text: parts.join('\n\n'), shown: count }
+  return { text: parts.join('\n\n'), shown: count, hasMoreInParagraph }
 }
 
 /**
