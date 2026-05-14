@@ -63,6 +63,8 @@ log('STT', `Committed for translation: "${text.slice(0, 60)}" ${sourceLang}>${ta
 
 The `splitIntoChunks` function in `listen.ts` can be **removed from listen.ts only**. `dialogue.ts` has its own independent copy — leave it untouched.
 
+**Also fix in `resumeListening`:** after a successful `appendParagraph`, dispatch `notewriter:session-updated` — this event is already present in `startListening` but was missing from `resumeListening`. Fix it while modifying both functions.
+
 ---
 
 ## Fix 3: Handle long paragraphs in live display
@@ -71,7 +73,9 @@ The `splitIntoChunks` function in `listen.ts` can be **removed from listen.ts on
 
 `fitToLines` currently skips any entry whose estimated line count exceeds `maxLines`. With 300-400 char commits, these are skipped entirely, making the committed text invisible.
 
-Fix: when the bottommost entry is too long to fit completely but there is remaining space, truncate it to fit instead of skipping:
+The display path is: `buildTranscriptText()` → `updateTop(bridge, text)` → `fitToLines(text, HALF_DISPLAY_LINES)`. The bug is in `fitToLines`.
+
+Fix: when the current entry is too long to fit completely but there is remaining display space, truncate it to show its tail instead of skipping it entirely. Remove the `fitted.length === 0` guard — without it, a long entry sitting above a short partial text entry is also handled correctly (the common real-world case).
 
 ```ts
 function fitToLines(text: string, maxLines: number): string {
@@ -81,9 +85,8 @@ function fitToLines(text: string, maxLines: number): string {
   for (let i = lines.length - 1; i >= 0; i--) {
     const lc = Math.max(1, Math.ceil(lines[i].length / CHARS_PER_LINE))
     if (usedLines + lc > maxLines) {
-      // If there's remaining space, show the tail of this line truncated to fit
       const remaining = maxLines - usedLines
-      if (remaining > 0 && fitted.length === 0) {
+      if (remaining > 0) {
         fitted.unshift(lines[i].slice(-(remaining * CHARS_PER_LINE)))
       }
       break
@@ -95,7 +98,7 @@ function fitToLines(text: string, maxLines: number): string {
 }
 ```
 
-This change benefits both Listen mode (long committed text) and History detail (long paragraphs). It is backward-compatible — short lines behave identically to before.
+Showing the **tail** (most recent characters) is correct for live transcript display — the newest words are most relevant. This is backward-compatible — short lines behave identically to before.
 
 ---
 
