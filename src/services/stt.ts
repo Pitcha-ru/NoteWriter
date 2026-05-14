@@ -83,6 +83,7 @@ export class SttClient {
       audio_format: 'pcm_16000',
       commit_strategy: 'vad',
       vad_silence_threshold_secs: this.config.vadSilenceThresholdSecs ?? '0.5',
+      diarize: 'true',
     })
     if (this.config.language && this.config.language !== 'auto') {
       params.set('language_code', this.config.language)
@@ -197,6 +198,8 @@ export class SttClient {
         this.audioPacketsSinceLastTranscript = 0
         this.totalCommits++
         log('STT', `Committed: "${msg.text.slice(0, 80)}" (len=${msg.text.length})`)
+        // Log full message to inspect diarization structure
+        log('STT', `RAW: ${JSON.stringify(msg).slice(0, 500)}`)
         this.committedCallbacks.forEach(cb => cb(msg.text))
         return
       }
