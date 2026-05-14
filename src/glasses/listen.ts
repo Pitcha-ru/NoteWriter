@@ -121,7 +121,7 @@ async function resumeListening(): Promise<void> {
 
   try {
     const { token } = await currentApi.getSttToken()
-    sttClient = new SttClient(token, { language: appState.settings.listenLang })
+    sttClient = new SttClient(token, { language: appState.settings.listenLang, vadSilenceThresholdSecs: '1.0' })
 
     sttClient.onPartialTranscript((text) => {
       partialText = text
@@ -221,7 +221,7 @@ export async function startListening(bridge: any, api: ApiClient): Promise<void>
 
     const { token } = await api.getSttToken()
 
-    sttClient = new SttClient(token, { language: appState.settings.listenLang })
+    sttClient = new SttClient(token, { language: appState.settings.listenLang, vadSilenceThresholdSecs: '1.0' })
 
     sttClient.onPartialTranscript((text) => {
       if (isNoise(text)) return
