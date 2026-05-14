@@ -327,9 +327,24 @@ function splitToWindows(text: string, maxLines: number): string[] {
 }
 
 function splitByChars(text: string, maxLines: number): string[] {
-  const chunkSize = maxLines * CHARS_PER_LINE
+  const maxChars = maxLines * CHARS_PER_LINE
+  const words = text.split(/\s+/)
   const chunks: string[] = []
-  for (let i = 0; i < text.length; i += chunkSize) chunks.push(text.slice(i, i + chunkSize))
+  let current = ''
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word
+    if (estimateLines(candidate) > maxLines && current) {
+      chunks.push(current)
+      current = word
+    } else if (estimateLines(word) > maxLines) {
+      // Single word longer than maxLines — hard-split as last resort
+      if (current) { chunks.push(current); current = '' }
+      for (let i = 0; i < word.length; i += maxChars) chunks.push(word.slice(i, i + maxChars))
+    } else {
+      current = candidate
+    }
+  }
+  if (current) chunks.push(current)
   return chunks
 }
 
