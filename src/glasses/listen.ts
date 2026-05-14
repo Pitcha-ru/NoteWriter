@@ -153,18 +153,20 @@ async function resumeListening(): Promise<void> {
         })
       })
 
-      const translateStart = Date.now()
-      currentApi!.translate(text, sourceLang, targetLang, appState.settings.translateProvider, appState.settings.translateModel)
-        .then(async (translated) => {
-          if (translated) {
-            log('TRANSLATE', `Response: "${translated.slice(0, 60)}" (${Date.now() - translateStart}ms)`)
-            committedPairs[idx].translation = translated
-            updateDisplay()
-            const paraId = await saveP
-            if (paraId) currentApi!.updateParagraphTranslation(paraId, translated).catch((e) => { log('ERR', `Translation update failed: ${e instanceof Error ? e.message : String(e)}`) })
-          }
-        })
-        .catch((e) => { log('ERR', `Translation failed: ${e instanceof Error ? e.message : String(e)}`) })
+      saveP.then((paraId) => {
+        const translateStart = Date.now()
+        currentApi!.translate(text, sourceLang, targetLang, appState.settings.translateProvider, appState.settings.translateModel)
+          .then(async (translated) => {
+            if (translated) {
+              if (!committedPairs[idx]) return
+              log('TRANSLATE', `Response: "${translated.slice(0, 60)}" (${Date.now() - translateStart}ms)`)
+              committedPairs[idx].translation = translated
+              updateDisplay()
+              if (paraId) currentApi!.updateParagraphTranslation(paraId, translated).catch((e) => { log('ERR', `Translation update failed: ${e instanceof Error ? e.message : String(e)}`) })
+            }
+          })
+          .catch((e) => { log('ERR', `Translation failed: ${e instanceof Error ? e.message : String(e)}`) })
+      })
     })
 
     sttClient.onError(() => {})
@@ -252,18 +254,20 @@ export async function startListening(bridge: any, api: ApiClient): Promise<void>
         })
       })
 
-      const translateStart = Date.now()
-      api.translate(text, sourceLang, targetLang, appState.settings.translateProvider, appState.settings.translateModel)
-        .then(async (translated) => {
-          if (translated) {
-            log('TRANSLATE', `Response: "${translated.slice(0, 60)}" (${Date.now() - translateStart}ms)`)
-            committedPairs[idx].translation = translated
-            updateDisplay()
-            const paraId = await savePromise
-            if (paraId) api.updateParagraphTranslation(paraId, translated).catch((e) => { log('ERR', `Translation update failed: ${e instanceof Error ? e.message : String(e)}`) })
-          }
-        })
-        .catch((e) => { log('ERR', `Translation failed: ${e instanceof Error ? e.message : String(e)}`) })
+      savePromise.then((paraId) => {
+        const translateStart = Date.now()
+        api.translate(text, sourceLang, targetLang, appState.settings.translateProvider, appState.settings.translateModel)
+          .then(async (translated) => {
+            if (translated) {
+              if (!committedPairs[idx]) return
+              log('TRANSLATE', `Response: "${translated.slice(0, 60)}" (${Date.now() - translateStart}ms)`)
+              committedPairs[idx].translation = translated
+              updateDisplay()
+              if (paraId) api.updateParagraphTranslation(paraId, translated).catch((e) => { log('ERR', `Translation update failed: ${e instanceof Error ? e.message : String(e)}`) })
+            }
+          })
+          .catch((e) => { log('ERR', `Translation failed: ${e instanceof Error ? e.message : String(e)}`) })
+      })
     })
 
     sttClient.onError(() => {})
