@@ -3,7 +3,7 @@ import { setPageContent, setMenuContent, updateText, buildHistoryPages } from '.
 import { appState } from '../services/state'
 import { ApiClient } from '../services/api'
 import { log } from '../services/logger'
-import type { Session, Paragraph } from '../types'
+import type { Session } from '../types'
 
 const DISPLAY_ID = 0
 
@@ -23,9 +23,6 @@ let sessions: Session[] = []
 let listCursorIndex = 0
 let listScrollOffset = 0  // first visible item index
 const VISIBLE_ITEMS = 7   // how many session items fit on screen
-let paragraphs: Paragraph[] = []
-let currentParagraphIndex = 0
-
 // ── History list (with cursor navigation) ────────────────────────────────────
 
 function renderHistoryList(bridge: any): void {
@@ -116,7 +113,6 @@ function renderPage(bridge: any): void {
 
 export async function showSessionDetail(bridge: any, api: ApiClient, sessionIndex: number): Promise<void> {
   appState.navigateTo('history_detail')
-  paragraphs = []
   pages = []
   currentPageIndex = 0
 
@@ -130,10 +126,9 @@ export async function showSessionDetail(bridge: any, api: ApiClient, sessionInde
 
   try {
     const response = await api.getSession(session.id)
-    paragraphs = response.paragraphs
-    log('SESSION', `Session detail loaded: ${paragraphs.length} paragraphs`)
+    log('SESSION', `Session detail loaded: ${response.paragraphs.length} paragraphs`)
 
-    pages = buildHistoryPages(paragraphs)
+    pages = buildHistoryPages(response.paragraphs)
     if (pages.length === 0) {
       updateText(bridge, DISPLAY_ID, 'No content in this session.\nDouble-click to go back.')
     } else {

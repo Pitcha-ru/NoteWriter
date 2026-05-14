@@ -274,7 +274,8 @@ export function buildHistoryPages(
   for (const para of paragraphs) {
     const origWindows = splitToWindows(para.original, HALF_LINES)
     const transWindows = para.translation ? splitToWindows(para.translation, HALF_LINES) : []
-    const count = Math.max(origWindows.length, transWindows.length, 1)
+    const count = Math.max(origWindows.length, transWindows.length)
+    if (count === 0) continue // skip empty paragraphs
     for (let i = 0; i < count; i++) {
       const orig = origWindows[i] ?? ''
       const trans = transWindows[i] ?? ''
@@ -291,8 +292,14 @@ function splitToWindows(text: string, maxLines: number): string[] {
   if (!trimmed) return []
   if (estimateLines(trimmed) <= maxLines) return [trimmed]
 
+  // Extract sentence-terminated parts + any trailing fragment without punctuation
+  const matched = trimmed.match(/[^.!?;]+[.!?;]+\s*/g) ?? []
+  const trailing = trimmed.slice(matched.join('').length).trim()
+  const sentences = matched.length > 0
+    ? (trailing ? [...matched, trailing] : matched)
+    : [trimmed]
+
   const result: string[] = []
-  const sentences = trimmed.match(/[^.!?;]+[.!?;]+\s*/g) ?? [trimmed]
   let current = ''
 
   for (const sentence of sentences) {
@@ -303,14 +310,14 @@ function splitToWindows(text: string, maxLines: number): string[] {
       if (estimateLines(next) > maxLines) {
         const chunks = splitByChars(next, maxLines)
         result.push(...chunks.slice(0, -1))
-        current = chunks.at(-1) ?? ''
+        current = chunks[chunks.length - 1] ?? ''
       } else {
         current = next
       }
     } else if (estimateLines(s) > maxLines) {
       const chunks = splitByChars(s.trimStart(), maxLines)
       result.push(...chunks.slice(0, -1))
-      current = chunks.at(-1) ?? ''
+      current = chunks[chunks.length - 1] ?? ''
     } else {
       current = s
     }
