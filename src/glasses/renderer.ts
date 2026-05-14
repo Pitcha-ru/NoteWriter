@@ -257,73 +257,73 @@ export function formatListenDisplay(
   return parts.join('\n')
 }
 
+// Lines available for content (1 reserved for page indicator)
+const CONTENT_LINES = MAX_DISPLAY_LINES - 1 // 8
+// Lines per half-screen (orig / trans split)
+const HALF_LINES = Math.floor(CONTENT_LINES / 2) // 4
+
 /**
- * Truncate text to fit within maxLines, breaking at word boundaries.
+ * Build a flat list of screen-sized pages from all paragraphs in a session.
+ * Each page fits on one screen. Text breaks at sentence boundaries where possible;
+ * only breaks mid-sentence when a single sentence exceeds the half-screen limit.
  */
-function truncateToFit(text: string, maxLines: number): string {
-  const words = text.split(/\s+/)
-  let result = ''
-  for (const word of words) {
-    const candidate = result ? `${result} ${word}` : word
-    if (estimateLines(candidate) > maxLines) break
-    result = candidate
+export function buildHistoryPages(
+  paragraphs: Array<{ original: string; translation: string }>
+): string[] {
+  const pages: string[] = []
+  for (const para of paragraphs) {
+    const origWindows = splitToWindows(para.original, HALF_LINES)
+    const transWindows = para.translation ? splitToWindows(para.translation, HALF_LINES) : []
+    const count = Math.max(origWindows.length, transWindows.length, 1)
+    for (let i = 0; i < count; i++) {
+      const orig = origWindows[i] ?? ''
+      const trans = transWindows[i] ?? ''
+      pages.push(trans ? `${orig}\n${trans}` : orig)
+    }
   }
-  return result || text.slice(0, CHARS_PER_LINE * maxLines)
+  return pages
 }
 
-/**
- * Show as many paragraphs as fit on screen starting from currentIndex.
- * Long paragraphs are shown in sub-page windows (subPage=0,1,2...).
- * Returns formatted text, count shown, and whether current paragraph has more content.
- */
-export function formatHistoryDetail(
-  paragraphs: Array<{ original: string; translation: string }>,
-  currentIndex: number,
-  subPage = 0
-): { text: string; shown: number; hasMoreInParagraph: boolean } {
-  if (!paragraphs[currentIndex]) return { text: '', shown: 0, hasMoreInParagraph: false }
+// Split text into windows of ≤maxLines display lines, breaking at sentence boundaries.
+// Falls back to character-based split only when a single sentence exceeds maxLines.
+function splitToWindows(text: string, maxLines: number): string[] {
+  const trimmed = text.trim()
+  if (!trimmed) return []
+  if (estimateLines(trimmed) <= maxLines) return [trimmed]
 
-  const maxContent = MAX_DISPLAY_LINES - 1 // reserve 1 line for page indicator
-  const parts: string[] = []
-  let linesUsed = 0
-  let count = 0
-  let hasMoreInParagraph = false
+  const result: string[] = []
+  const sentences = trimmed.match(/[^.!?;]+[.!?;]+\s*/g) ?? [trimmed]
+  let current = ''
 
-  for (let i = currentIndex; i < paragraphs.length; i++) {
-    const p = paragraphs[i]
-    const remaining = maxContent - linesUsed
-    if (remaining <= 0 && count > 0) break
-
-    let orig = p.original
-    let trans = p.translation
-
-    const fullBlock = trans ? `${orig}\n${trans}` : orig
-    const fullLines = estimateLines(fullBlock) + (count > 0 ? 1 : 0)
-
-    if (linesUsed + fullLines > maxContent) {
-      if (count > 0) break
-      // Long paragraph — show a sub-page window instead of truncating
-      const linesForOrig = trans ? Math.floor(remaining / 2) : remaining
-      const linesForTrans = remaining - linesForOrig
-      const charsPerOrig = linesForOrig * CHARS_PER_LINE
-      const charsPerTrans = linesForTrans * CHARS_PER_LINE
-      const origStart = subPage * charsPerOrig
-      const transStart = subPage * charsPerTrans
-      orig = orig.slice(origStart, origStart + charsPerOrig)
-      if (trans) trans = trans.slice(transStart, transStart + charsPerTrans)
-      const p0 = paragraphs[i]
-      hasMoreInParagraph = origStart + charsPerOrig < p0.original.length ||
-        (!!p0.translation && transStart + charsPerTrans < p0.translation.length)
+  for (const sentence of sentences) {
+    const s = current ? `${current}${sentence}` : sentence.trimStart()
+    if (estimateLines(s) > maxLines && current) {
+      result.push(current.trim())
+      const next = sentence.trimStart()
+      if (estimateLines(next) > maxLines) {
+        const chunks = splitByChars(next, maxLines)
+        result.push(...chunks.slice(0, -1))
+        current = chunks.at(-1) ?? ''
+      } else {
+        current = next
+      }
+    } else if (estimateLines(s) > maxLines) {
+      const chunks = splitByChars(s.trimStart(), maxLines)
+      result.push(...chunks.slice(0, -1))
+      current = chunks.at(-1) ?? ''
+    } else {
+      current = s
     }
-
-    const block = trans ? `${orig}\n${trans}` : orig
-    const blockLines = estimateLines(block) + (count > 0 ? 1 : 0)
-    linesUsed += blockLines
-    parts.push(block)
-    count++
   }
+  if (current.trim()) result.push(current.trim())
+  return result.filter(w => w.trim().length > 0)
+}
 
-  return { text: parts.join('\n\n'), shown: count, hasMoreInParagraph }
+function splitByChars(text: string, maxLines: number): string[] {
+  const chunkSize = maxLines * CHARS_PER_LINE
+  const chunks: string[] = []
+  for (let i = 0; i < text.length; i += chunkSize) chunks.push(text.slice(i, i + chunkSize))
+  return chunks
 }
 
 /**

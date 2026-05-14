@@ -1,5 +1,5 @@
 // src/glasses/history.ts
-import { setPageContent, setMenuContent, updateText, formatHistoryDetail } from './renderer'
+import { setPageContent, setMenuContent, updateText, buildHistoryPages } from './renderer'
 import { appState } from '../services/state'
 import { ApiClient } from '../services/api'
 import { log } from '../services/logger'
@@ -103,25 +103,22 @@ export function handleHistoryListEvent(
   }
 }
 
-// ── Session detail (scroll through paragraphs) ──────────────────────────────
+// ── Session detail (flat page list) ─────────────────────────────────────────
 
-let lastShown = 1 // how many paragraphs were shown on last render
-let currentSubPage = 0 // sub-page within current paragraph (for long paragraphs)
-let lastHasMoreInParagraph = false
+let pages: string[] = []
+let currentPageIndex = 0
 
-function renderParagraph(bridge: any): void {
-  const { text, shown, hasMoreInParagraph } = formatHistoryDetail(paragraphs, currentParagraphIndex, currentSubPage)
-  lastShown = Math.max(shown, 1)
-  lastHasMoreInParagraph = hasMoreInParagraph
-  const endIdx = Math.min(currentParagraphIndex + lastShown, paragraphs.length)
-  const indicator = `${currentParagraphIndex + 1}-${endIdx}/${paragraphs.length}${hasMoreInParagraph ? '→' : ''}`
-  updateText(bridge, DISPLAY_ID, `${indicator}\n${text}`)
+function renderPage(bridge: any): void {
+  if (pages.length === 0) return
+  const indicator = `${currentPageIndex + 1}/${pages.length}`
+  updateText(bridge, DISPLAY_ID, `${indicator}\n${pages[currentPageIndex]}`)
 }
 
 export async function showSessionDetail(bridge: any, api: ApiClient, sessionIndex: number): Promise<void> {
   appState.navigateTo('history_detail')
   paragraphs = []
-  currentParagraphIndex = 0
+  pages = []
+  currentPageIndex = 0
 
   const session = sessions[sessionIndex]
   if (!session) {
@@ -136,12 +133,12 @@ export async function showSessionDetail(bridge: any, api: ApiClient, sessionInde
     paragraphs = response.paragraphs
     log('SESSION', `Session detail loaded: ${paragraphs.length} paragraphs`)
 
-    if (paragraphs.length === 0) {
+    pages = buildHistoryPages(paragraphs)
+    if (pages.length === 0) {
       updateText(bridge, DISPLAY_ID, 'No content in this session.\nDouble-click to go back.')
     } else {
-      currentParagraphIndex = 0
-      currentSubPage = 0
-      renderParagraph(bridge)
+      currentPageIndex = 0
+      renderPage(bridge)
     }
   } catch (e) {
     log('ERR', `Session detail load failed: ${e instanceof Error ? e.message : String(e)}`)
@@ -159,24 +156,16 @@ export function handleHistoryDetailEvent(
     case 3: // DOUBLE_CLICK — back to list
       onBack()
       break
-    case 1: // UP — previous sub-page or previous paragraph
-      if (currentSubPage > 0) {
-        currentSubPage--
-        renderParagraph(bridge)
-      } else if (currentParagraphIndex > 0) {
-        currentParagraphIndex = Math.max(0, currentParagraphIndex - lastShown)
-        currentSubPage = 0
-        renderParagraph(bridge)
+    case 1: // UP — previous page
+      if (currentPageIndex > 0) {
+        currentPageIndex--
+        renderPage(bridge)
       }
       break
-    case 2: // DOWN — next sub-page or next paragraph
-      if (lastHasMoreInParagraph) {
-        currentSubPage++
-        renderParagraph(bridge)
-      } else if (currentParagraphIndex + lastShown < paragraphs.length) {
-        currentParagraphIndex += lastShown
-        currentSubPage = 0
-        renderParagraph(bridge)
+    case 2: // DOWN — next page
+      if (currentPageIndex < pages.length - 1) {
+        currentPageIndex++
+        renderPage(bridge)
       }
       break
   }
