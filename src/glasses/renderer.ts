@@ -165,13 +165,19 @@ export function updateBottom(bridge: any, text: string): void {
 }
 
 /** Fit text to N lines, keeping newest (bottom) lines */
-function fitToLines(text: string, maxLines: number): string {
+export function fitToLines(text: string, maxLines: number): string {
   const lines = text.split('\n')
   const fitted: string[] = []
   let usedLines = 0
   for (let i = lines.length - 1; i >= 0; i--) {
     const lc = Math.max(1, Math.ceil(lines[i].length / CHARS_PER_LINE))
-    if (usedLines + lc > maxLines) break
+    if (usedLines + lc > maxLines) {
+      const remaining = maxLines - usedLines
+      if (remaining > 0) {
+        fitted.unshift(lines[i].slice(-(remaining * CHARS_PER_LINE)))
+      }
+      break
+    }
     fitted.unshift(lines[i])
     usedLines += lc
   }
