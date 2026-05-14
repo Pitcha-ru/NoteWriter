@@ -34,40 +34,6 @@ function resetListenState(): void {
 }
 
 // Filter out non-speech sounds like (sound of falling), [music], etc.
-// Split long text into sentence-sized chunks (~100 chars each)
-function splitIntoChunks(text: string, maxLen = 120): string[] {
-  if (text.length <= maxLen) return [text]
-  // Try splitting on sentence boundaries first
-  const sentences = text.match(/[^.!?;]+[.!?;]+\s*/g)
-  if (sentences && sentences.length > 1) {
-    const chunks: string[] = []
-    let current = ''
-    for (const s of sentences) {
-      if (current.length + s.length > maxLen && current) {
-        chunks.push(current.trim())
-        current = s
-      } else {
-        current += s
-      }
-    }
-    if (current.trim()) chunks.push(current.trim())
-    if (chunks.length > 1) return chunks
-  }
-  // Fallback: split on word boundaries when no punctuation found
-  const words = text.split(/\s+/)
-  const chunks: string[] = []
-  let current = ''
-  for (const w of words) {
-    if (current.length + w.length + 1 > maxLen && current) {
-      chunks.push(current)
-      current = w
-    } else {
-      current = current ? current + ' ' + w : w
-    }
-  }
-  if (current) chunks.push(current)
-  return chunks.length > 0 ? chunks : [text]
-}
 
 // Sequential save queue — ensures paragraphs are saved in order
 let saveQueue: Promise<any> = Promise.resolve()
@@ -159,49 +125,46 @@ async function resumeListening(): Promise<void> {
 
     sttClient.onPartialTranscript((text) => {
       partialText = text
-      updateDisplay()
     })
 
     sttClient.onCommittedTranscript((text) => {
       partialText = ''
       if (isNoise(text)) return
-      const chunks = splitIntoChunks(text)
+
+      const idx = committedPairs.length
       const sourceLang = appState.settings.listenLang
       const targetLang = appState.settings.translateLang
-      for (const chunk of chunks) {
-        const idx = committedPairs.length
-        committedPairs.push({ original: chunk, translation: '' })
-        log('STT', `Chunk queued for translation: "${chunk.slice(0, 60)}" ${sourceLang}>${targetLang}`)
-        updateDisplay()
+      committedPairs.push({ original: text, translation: '' })
+      log('STT', `Committed for translation: "${text.slice(0, 60)}" ${sourceLang}>${targetLang}`)
 
-        const saveP = new Promise<string | null>((resolve) => {
-          enqueueSave(async () => {
-            const sessionId = appState.currentSessionId
-            if (sessionId) {
-              try {
-                const p = await currentApi!.appendParagraph(sessionId, chunk, '')
-                log('SAVE', `Paragraph saved id=${p.id}`)
-                resolve(p.id)
-                return
-              } catch (e) { log('ERR', `Paragraph save failed: ${e instanceof Error ? e.message : String(e)}`) }
-            }
-            resolve(null)
-          })
+      const saveP = new Promise<string | null>((resolve) => {
+        enqueueSave(async () => {
+          const sessionId = appState.currentSessionId
+          if (sessionId) {
+            try {
+              const p = await currentApi!.appendParagraph(sessionId, text, '')
+              log('SAVE', `Paragraph saved id=${p.id}`)
+              window.dispatchEvent(new CustomEvent('notewriter:session-updated'))
+              resolve(p.id)
+              return
+            } catch (e) { log('ERR', `Paragraph save failed: ${e instanceof Error ? e.message : String(e)}`) }
+          }
+          resolve(null)
         })
+      })
 
-        const translateStart = Date.now()
-        currentApi!.translate(chunk, sourceLang, targetLang, appState.settings.translateProvider, appState.settings.translateModel)
-          .then(async (translated) => {
-            if (translated) {
-              log('TRANSLATE', `Response: "${translated.slice(0, 60)}" (${Date.now() - translateStart}ms)`)
-              committedPairs[idx].translation = translated
-              updateDisplay()
-              const paraId = await saveP
-              if (paraId) currentApi!.updateParagraphTranslation(paraId, translated).catch((e) => { log('ERR', `Translation update failed: ${e instanceof Error ? e.message : String(e)}`) })
-            }
-          })
-          .catch((e) => { log('ERR', `Translation failed: ${e instanceof Error ? e.message : String(e)}`) })
-      }
+      const translateStart = Date.now()
+      currentApi!.translate(text, sourceLang, targetLang, appState.settings.translateProvider, appState.settings.translateModel)
+        .then(async (translated) => {
+          if (translated) {
+            log('TRANSLATE', `Response: "${translated.slice(0, 60)}" (${Date.now() - translateStart}ms)`)
+            committedPairs[idx].translation = translated
+            updateDisplay()
+            const paraId = await saveP
+            if (paraId) currentApi!.updateParagraphTranslation(paraId, translated).catch((e) => { log('ERR', `Translation update failed: ${e instanceof Error ? e.message : String(e)}`) })
+          }
+        })
+        .catch((e) => { log('ERR', `Translation failed: ${e instanceof Error ? e.message : String(e)}`) })
     })
 
     sttClient.onError(() => {})
@@ -261,58 +224,50 @@ export async function startListening(bridge: any, api: ApiClient): Promise<void>
     sttClient.onPartialTranscript((text) => {
       if (isNoise(text)) return
       partialText = text
-      updateDisplay()
     })
 
     sttClient.onCommittedTranscript((text) => {
       partialText = ''
       if (isNoise(text)) return
 
-      const chunks = splitIntoChunks(text)
+      const idx = committedPairs.length
       const sourceLang = appState.settings.listenLang
       const targetLang = appState.settings.translateLang
+      committedPairs.push({ original: text, translation: '' })
+      log('STT', `Committed for translation: "${text.slice(0, 60)}" ${sourceLang}>${targetLang}`)
 
-      for (const chunk of chunks) {
-        const idx = committedPairs.length
-        committedPairs.push({ original: chunk, translation: '' })
-        log('STT', `Chunk queued for translation: "${chunk.slice(0, 60)}" ${sourceLang}>${targetLang}`)
-        updateDisplay()
-
-        // Save sequentially (queue ensures correct order)
-        const savePromise = new Promise<string | null>((resolve) => {
-          enqueueSave(async () => {
-            const sessionId = appState.currentSessionId
-            if (sessionId) {
-              try {
-                const p = await api.appendParagraph(sessionId, chunk, '')
-                log('SAVE', `Paragraph saved id=${p.id}`)
-                window.dispatchEvent(new CustomEvent('notewriter:session-updated'))
-                resolve(p.id)
-                return
-              } catch (e) { log('ERR', `Paragraph save failed: ${e instanceof Error ? e.message : String(e)}`) }
-            }
-            resolve(null)
-          })
+      const savePromise = new Promise<string | null>((resolve) => {
+        enqueueSave(async () => {
+          const sessionId = appState.currentSessionId
+          if (sessionId) {
+            try {
+              const p = await api.appendParagraph(sessionId, text, '')
+              log('SAVE', `Paragraph saved id=${p.id}`)
+              window.dispatchEvent(new CustomEvent('notewriter:session-updated'))
+              resolve(p.id)
+              return
+            } catch (e) { log('ERR', `Paragraph save failed: ${e instanceof Error ? e.message : String(e)}`) }
+          }
+          resolve(null)
         })
+      })
 
-        // Translate in parallel (don't wait in queue)
-        const translateStart = Date.now()
-        api.translate(chunk, sourceLang, targetLang, appState.settings.translateProvider, appState.settings.translateModel)
-          .then(async (translated) => {
-            if (translated) {
-              log('TRANSLATE', `Response: "${translated.slice(0, 60)}" (${Date.now() - translateStart}ms)`)
-              committedPairs[idx].translation = translated
-              updateDisplay()
-              const paraId = await savePromise
-              if (paraId) api.updateParagraphTranslation(paraId, translated).catch((e) => { log('ERR', `Translation update failed: ${e instanceof Error ? e.message : String(e)}`) })
-            }
-          })
-          .catch((e) => { log('ERR', `Translation failed: ${e instanceof Error ? e.message : String(e)}`) })
-      }
+      const translateStart = Date.now()
+      api.translate(text, sourceLang, targetLang, appState.settings.translateProvider, appState.settings.translateModel)
+        .then(async (translated) => {
+          if (translated) {
+            log('TRANSLATE', `Response: "${translated.slice(0, 60)}" (${Date.now() - translateStart}ms)`)
+            committedPairs[idx].translation = translated
+            updateDisplay()
+            const paraId = await savePromise
+            if (paraId) api.updateParagraphTranslation(paraId, translated).catch((e) => { log('ERR', `Translation update failed: ${e instanceof Error ? e.message : String(e)}`) })
+          }
+        })
+        .catch((e) => { log('ERR', `Translation failed: ${e instanceof Error ? e.message : String(e)}`) })
     })
 
     sttClient.onError(() => {})
-    sttClient.onStatus((msg) => { sttStatus = msg; updateDisplay() })
+    sttClient.onStatus((msg) => { sttStatus = msg })
 
     sttClient.connect()
     bridge.audioControl(true)
