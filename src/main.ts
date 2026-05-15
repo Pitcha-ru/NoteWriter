@@ -147,8 +147,8 @@ async function init() {
     const selectedIndex = event.listEvent?.selectedIndex ?? 0
     if (eventType === undefined) return
 
-    // Block CLICK events for 1.5s after screen change (ghost click from double-click)
-    if (eventType === 0 && Date.now() - lastScreenChange < 1500) return
+    // Block click and double-click for 1.5s after screen change (ghost events from double-click)
+    if ((eventType === 0 || eventType === 3) && Date.now() - lastScreenChange < 1500) return
 
     // Debounce scroll/swipe events
     if ((eventType === 1 || eventType === 2) && Date.now() - lastScrollTime < SCROLL_DEBOUNCE_MS) return
