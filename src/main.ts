@@ -147,8 +147,8 @@ async function init() {
     const selectedIndex = event.listEvent?.selectedIndex ?? 0
     if (eventType === undefined) return
 
-    // Block click and double-click for 1.5s after screen change (ghost events from double-click)
-    if ((eventType === 0 || eventType === 3) && Date.now() - lastScreenChange < 1500) return
+    // Block click and double-click for 800ms after screen change (ghost events from double-click)
+    if ((eventType === 0 || eventType === 3) && Date.now() - lastScreenChange < 800) return
 
     // Debounce scroll/swipe events
     if ((eventType === 1 || eventType === 2) && Date.now() - lastScrollTime < SCROLL_DEBOUNCE_MS) return
@@ -186,9 +186,9 @@ async function init() {
       case 'stealth': handleStealthEvent(bridge, eventType, api, () => navigateWithGuard(() => { resetAll(); showMenu(bridge) })); break
       case 'dialogue': handleDialogueEvent(bridge, eventType, api, () => navigateWithGuard(() => { resetAll(); showMenu(bridge) })); break
       case 'notes_list': handleNotesListEvent(bridge, eventType, selectedIndex, api, () => navigateWithGuard(() => showMenu(bridge))); break
-      case 'notes_detail': handleNoteDetailEvent(bridge, eventType, api, () => navigateWithGuard(() => showNotesList(bridge, api))); break
+      case 'notes_detail': handleNoteDetailEvent(bridge, eventType, api, () => navigateWithGuard(() => showNotesList(bridge, api, false))); break
       case 'history_list': handleHistoryListEvent(bridge, eventType, selectedIndex, api, () => navigateWithGuard(() => showMenu(bridge))); break
-      case 'history_detail': handleHistoryDetailEvent(bridge, eventType, api, () => navigateWithGuard(() => showHistoryList(bridge, api))); break
+      case 'history_detail': handleHistoryDetailEvent(bridge, eventType, api, () => navigateWithGuard(() => showHistoryList(bridge, api, false))); break
       case 'settings': handleSettingsEvent(bridge, eventType, selectedIndex, api, () => navigateWithGuard(() => showMenu(bridge))); break
     }
   })

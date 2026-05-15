@@ -36,11 +36,10 @@ function renderNotesList(bridge: any): void {
   setMenuContent(bridge, `${indicator}\n${lines.join('\n')}`)
 }
 
-export async function showNotesList(bridge: any, api: ApiClient): Promise<void> {
+export async function showNotesList(bridge: any, api: ApiClient, resetCursor = true): Promise<void> {
   appState.navigateTo('notes_list')
   notes = []
-  listCursorIndex = 0
-  listScrollOffset = 0
+  if (resetCursor) { listCursorIndex = 0; listScrollOffset = 0 }
 
   setMenuContent(bridge, 'Loading...')
 
